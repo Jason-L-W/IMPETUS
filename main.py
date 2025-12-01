@@ -30,13 +30,16 @@ def main():
     part1 = tracks.TrackPart.cobrarollCG_func(10)
     X1, Y1, Z1, Fx1, Fy1, Fz1, Lx1, Ly1, Lz1, Nx1, Ny1, Nz1, file_name1 = part1
     print("First part CSV file generated:", file_name1)
-    part2 = tracks.TrackPart.camelback_func(7)
+    part2 = tracks.TrackPart.break_func(15)
     X2, Y2, Z2, Fx2, Fy2, Fz2, Lx2, Ly2, Lz2, Nx2, Ny2, Nz2, file_name2 = part2
     print("Second part CSV file generated:", file_name2)
+    part3 = tracks.TrackPart.camelback_func(7)
+    X3, Y3, Z3, Fx3, Fy3, Fz3, Lx3, Ly3, Lz3, Nx3, Ny3, Nz3, file_name3 = part3
+    print("Third part CSV file generated:", file_name3)
 
     # build.plot(part1)
     # build.plot(part2)
-    combined = tracks.TrackPart.combine_tracks(part1, part2)
+    combined = tracks.TrackPart.combine_tracks(part1, part2, part3)
     build.plot(combined)
 
 

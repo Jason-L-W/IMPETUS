@@ -340,10 +340,10 @@ class TrackPart:
             return None
 
         # Flatten the first part
-        X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, _ = parts[0]
+        X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, _ = float(parts[0])
 
         for part in parts[1:]:
-            X2, Y2, Z2, Fx2, Fy2, Fz2, Lx2, Ly2, Lz2, Nx2, Ny2, Nz2, _ = part
+            X2, Y2, Z2, Fx2, Fy2, Fz2, Lx2, Ly2, Lz2, Nx2, Ny2, Nz2, _ = float(part)
 
             # Offset the new part to connect smoothly
             X2 += X[-1] - X2[0]

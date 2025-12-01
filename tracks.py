@@ -334,16 +334,41 @@ class TrackPart:
 
     # ========================== Combine multiple track parts into one (done) ==========================
     # Combines multiple track parts into one
-    # TODO Need to test and fix
+    # TODO Need to test and fix --> need to make them floats so that they can be concatenated properly
     def combine_tracks(*parts):
         if not parts:
             return None
 
         # Flatten the first part
-        X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, _ = float(parts[0])
+        X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, _ = parts[0]
+        X = X.astype(float)
+        Y = Y.astype(float)
+        Z = Z.astype(float)
+        Fx = Fx.astype(float)
+        Fy = Fy.astype(float)
+        Fz = Fz.astype(float)
+        Lx = Lx.astype(float)
+        Ly = Ly.astype(float)
+        Lz = Lz.astype(float)
+        Nx = Nx.astype(float)
+        Ny = Ny.astype(float)
+        Nz = Nz.astype(float)
 
         for part in parts[1:]:
-            X2, Y2, Z2, Fx2, Fy2, Fz2, Lx2, Ly2, Lz2, Nx2, Ny2, Nz2, _ = float(part)
+            X2, Y2, Z2, Fx2, Fy2, Fz2, Lx2, Ly2, Lz2, Nx2, Ny2, Nz2, _ = part
+            X2 = X2.astype(float)
+            Y2 = Y2.astype(float)
+            Z2 = Z2.astype(float)
+            Fx2 = Fx2.astype(float)
+            Fy2 = Fy2.astype(float)
+            Fz2 = Fz2.astype(float)
+            Lx2 = Lx2.astype(float)
+            Ly2 = Ly2.astype(float)
+            Lz2 = Lz2.astype(float)
+            Nx2 = Nx2.astype(float)
+            Ny2 = Ny2.astype(float)
+            Nz2 = Nz2.astype(float)
+
 
             # Offset the new part to connect smoothly
             X2 += X[-1] - X2[0]

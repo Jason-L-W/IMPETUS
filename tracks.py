@@ -140,12 +140,12 @@ class TrackPart:
         eps = 1e-8 # Used to prevent division by zero
 
         for i in range(len(X)):
-            Ry[0, :, i] = [dX[i,0] / (dXZ[i,0]+eps), 0, -dZ[i,0] / (dXZ[i,0]+eps)]
+            Ry[0, :, i] = [dX[i,0] / (dXZ[i,0]), 0, -dZ[i,0] / (dXZ[i,0])]
             Ry[1, :, i] = [0, 1, 0]
-            Ry[2, :, i] = [dZ[i,0] / (dXZ[i,0]+eps), 0, dX[i,0] / (dXZ[i,0]+eps)]
+            Ry[2, :, i] = [dZ[i,0] / (dXZ[i,0]), 0, dX[i,0] / (dXZ[i,0])]
 
-            Rz[0, :, i] = [dXZ[i,0] / (dS[i,0]+eps), -dY[i,0] / (dS[i,0]+eps), 0]
-            Rz[1, :, i] = [dY[i,0] / (dS[i,0]+eps),  dXZ[i,0] / (dS[i,0]+eps), 0]
+            Rz[0, :, i] = [dXZ[i,0] / (dS[i,0]), -dY[i,0] / (dS[i,0]), 0]
+            Rz[1, :, i] = [dY[i,0] / (dS[i,0]),  dXZ[i,0] / (dS[i,0]), 0]
             Rz[2, :, i] = [0, 0, 1]
 
         # Apply rotations to N

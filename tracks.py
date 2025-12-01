@@ -22,7 +22,7 @@ class TrackPart:
         # Scales the track based on your input scale
         track_data[:, 1:4] = track_data[:, 1:4] * scale / np.max(data[:, 2])
 
-        X, Y, Z = track_data[:, 1], track_data[:, 2], track_data[:, 3]
+        X, Y, Z = track_data[:, 1] / 3, track_data[:, 2], track_data[:, 3]
         Fx, Fy, Fz = track_data[:, 4], track_data[:, 5], track_data[:, 6]
         Lx, Ly, Lz = track_data[:, 7], track_data[:, 8], track_data[:, 9]
         Nx, Ny, Nz = track_data[:, 10], track_data[:, 11], track_data[:, 12]
@@ -71,7 +71,7 @@ class TrackPart:
         file_name = CSV.write_csv(camelback, pts, h, "camelback")
         return X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name
     
-    # ========================== Cobra Roll track part (should be done) ==========================
+    # ========================== Cobra Roll track part (done) ==========================
     def cobrarollCG_func(h):
         data = CSV.read_csv("flashbackcobraroll.csv")
         cobraroll = data.copy()
@@ -122,7 +122,6 @@ class TrackPart:
         Z = np.concatenate([Z1, Z2, Z3])
         Phi = np.concatenate([Phi1, Phi2, Phi3])
 
-        
         dX = np.concatenate(([X[0]], X[1:] - X[:-1]))[:, np.newaxis]
         dY = np.concatenate(([Y[0]], Y[1:] - Y[:-1]))[:, np.newaxis]
         dZ = np.concatenate(([Z[0]], Z[1:] - Z[:-1]))[:, np.newaxis]
@@ -227,7 +226,7 @@ class TrackPart:
 
         return None
 
-    # TODO
+    # ========================== Horseshoe roll track part (TODO) ==========================
     def horseshoe_func(h):
         return None
 
@@ -318,23 +317,24 @@ class TrackPart:
         
         return X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name
     
-    # TODO
+    # ========================== Loop with 2 different radii (TODO) ==========================
     # 2 Loops
     def loopwith2Rs(r1, r2):
         return None
 
-    # TODO
+    # ========================== Rollback track part (TODO) ==========================
     def rollback_func(h):
         R = (2/3) * h
 
         return None
 
-    # TODO
+    # ========================== Rollup track part (TODO) ==========================
     def rollup_func(h):
         return None
 
     # ========================== Combine multiple track parts into one (done) ==========================
     # Combines multiple track parts into one
+    # TODO Need to test and fix
     def combine_tracks(*parts):
         if not parts:
             return None
@@ -350,7 +350,7 @@ class TrackPart:
             Y2 += Y[-1] - Y2[0]
             Z2 += Z[-1] - Z2[0]
 
-            # Concatenate safely
+            # Concatenate track parts
             X = np.concatenate([X, X2])
             Y = np.concatenate([Y, Y2])
             Z = np.concatenate([Z, Z2])
@@ -363,7 +363,6 @@ class TrackPart:
             Nx = np.concatenate([Nx, Nx2])
             Ny = np.concatenate([Ny, Ny2])
             Nz = np.concatenate([Nz, Nz2])
-
 
         pts = len(X)
         data = np.column_stack((np.arange(1, pts+1), X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz))

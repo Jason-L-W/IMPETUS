@@ -366,7 +366,7 @@ class TrackPart:
 
         pts = len(X)
         data = np.column_stack((np.arange(1, pts+1), X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz))
-        file_name = CSV.write_csv(data, pts, "combined_track")
+        file_name = CSV.write_csv(data, pts, 0, "combined_track")
 
         return X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name
 

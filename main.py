@@ -34,8 +34,8 @@ def main():
     X2, Y2, Z2, Fx2, Fy2, Fz2, Lx2, Ly2, Lz2, Nx2, Ny2, Nz2, file_name2 = part2
     print("Second part CSV file generated:", file_name2)
 
-    build.plot(part1)
-    build.plot(part2)
+    # build.plot(part1)
+    # build.plot(part2)
     combined = tracks.TrackPart.combine_tracks(part1, part2)
     build.plot(combined)
 

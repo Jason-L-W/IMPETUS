@@ -336,22 +336,21 @@ class TrackPart:
     # ========================== Combine multiple track parts into one (done) ==========================
     # Combines multiple track parts into one
     def combine_tracks(*parts):
-        # Handles empty inputs
         if not parts:
             return None
-        
+
+        # Flatten the first part
         X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, _ = parts[0]
 
-        # Iterate through remaining parts and concatenate
         for part in parts[1:]:
             X2, Y2, Z2, Fx2, Fy2, Fz2, Lx2, Ly2, Lz2, Nx2, Ny2, Nz2, _ = part
 
-            # Offset the new part to connect to the previous part
+            # Offset the new part to connect smoothly
             X2 += X[-1] - X2[0]
             Y2 += Y[-1] - Y2[0]
             Z2 += Z[-1] - Z2[0]
 
-            # Combine the parts
+            # Concatenate safely
             X = np.concatenate([X, X2])
             Y = np.concatenate([Y, Y2])
             Z = np.concatenate([Z, Z2])
@@ -365,12 +364,12 @@ class TrackPart:
             Ny = np.concatenate([Ny, Ny2])
             Nz = np.concatenate([Nz, Nz2])
 
+
         pts = len(X)
         data = np.column_stack((np.arange(1, pts+1), X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz))
         file_name = CSV.write_csv(data, pts, "combined_track")
 
         return X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name
-
 
 
 

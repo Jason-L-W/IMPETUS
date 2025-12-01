@@ -18,14 +18,19 @@ def main():
     """
     # Test code
     # Runs chosen track
-    results = tracks.TrackPart.corkscrew_func(19)  # Changable parameters for different tracks
-    X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name = results
-    print("CSV file generated:", file_name)
+    # results = tracks.TrackPart.corkscrew_func(19)  # Changable parameters for different tracks
+    # X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name = results
+    # print("CSV file generated:", file_name)
     
 
-    # Plots chosen track in a 3D plot
-    build.plot(results)
+    # # Plots chosen track in a 3D plot
+    # build.plot(results)
 
+    # Test combining multiple track parts
+    part1 = tracks.TrackPart.cobrarollCG_func(10)
+    part2 = tracks.TrackPart.corkscrew_func(19)
+    combined = tracks.TrackPart.combine_tracks(part1, part2)
+    build.plot(combined)
     
 
 

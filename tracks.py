@@ -14,7 +14,24 @@ class TrackPart:
         for key in attr:
             setattr(self, key, kwargs.get(key, None))
 
-    # Break track part (done)
+    # ========================== Any track given data ==========================
+    # Given data from a csv file, scale it and return the track part
+    def from_data(data, scale, name):
+        track_data = data.copy()
+
+        # Scales the track based on your input scale
+        track_data[:, 1:4] = track_data[:, 1:4] * scale / np.max(data[:, 2])
+
+        X, Y, Z = track_data[:, 1], track_data[:, 2], track_data[:, 3]
+        Fx, Fy, Fz = track_data[:, 4], track_data[:, 5], track_data[:, 6]
+        Lx, Ly, Lz = track_data[:, 7], track_data[:, 8], track_data[:, 9]
+        Nx, Ny, Nz = track_data[:, 10], track_data[:, 11], track_data[:, 12]
+
+        pts = len(track_data)
+        file_name = CSV.write_csv(track_data, pts, scale, name)
+        return X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name
+
+    # ========================== Break track part (done) ==========================
     def break_func(L):
         X = np.arange(0, L+1, 1)
         pts = len(X)
@@ -36,7 +53,7 @@ class TrackPart:
         file_name = CSV.write_csv(data, pts, L, "break")
         return X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name
     
-    # Camelback track part (done)
+    # ========================== Camelback track part (done) ==========================
     def camelback_func(h):
         data = CSV.read_csv("cometcamelback.csv")
         camelback = data.copy()
@@ -54,7 +71,7 @@ class TrackPart:
         file_name = CSV.write_csv(camelback, pts, h, "camelback")
         return X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name
     
-    # Cobra Roll track part (should be done)
+    # ========================== Cobra Roll track part (should be done) ==========================
     def cobrarollCG_func(h):
         data = CSV.read_csv("flashbackcobraroll.csv")
         cobraroll = data.copy()
@@ -70,7 +87,7 @@ class TrackPart:
         file_name = CSV.write_csv(cobraroll, pts, h, "cobarollCG")
         return X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name
 
-    # Crokscrew track part (done)
+    # ========================== Corkscrew track part (done) ==========================
     def corkscrew_func(h):
         H = h * 4 # Total height of corkscrew
         r1 = H/2 # Radius of corkscrew
@@ -120,13 +137,15 @@ class TrackPart:
         Rz = np.zeros((3, 3, len(X)))
 
         # Build rotation matrices
-        for i in range(len(X)):
-            Ry[0, :, i] = [dX[i,0] / dXZ[i,0], 0, -dZ[i,0] / dXZ[i,0]]
-            Ry[1, :, i] = [0, 1, 0]
-            Ry[2, :, i] = [dZ[i,0] / dXZ[i,0], 0, dX[i,0] / dXZ[i,0]]
+        eps = 1e-8 # Used to prevent division by zero
 
-            Rz[0, :, i] = [dXZ[i,0] / dS[i,0], -dY[i,0] / dS[i,0], 0]
-            Rz[1, :, i] = [dY[i,0] / dS[i,0],  dXZ[i,0] / dS[i,0], 0]
+        for i in range(len(X)):
+            Ry[0, :, i] = [dX[i,0] / (dXZ[i,0]+eps), 0, -dZ[i,0] / (dXZ[i,0]+eps)]
+            Ry[1, :, i] = [0, 1, 0]
+            Ry[2, :, i] = [dZ[i,0] / (dXZ[i,0]+eps), 0, dX[i,0] / (dXZ[i,0]+eps)]
+
+            Rz[0, :, i] = [dXZ[i,0] / (dS[i,0]+eps), -dY[i,0] / (dS[i,0]+eps), 0]
+            Rz[1, :, i] = [dY[i,0] / (dS[i,0]+eps),  dXZ[i,0] / (dS[i,0]+eps), 0]
             Rz[2, :, i] = [0, 0, 1]
 
         # Apply rotations to N
@@ -212,7 +231,7 @@ class TrackPart:
     def horseshoe_func(h):
         return None
 
-    # Lifthill track part (done)
+    # ========================== Lifthill track part (done) ==========================
     def lifthill_func(h):
         # h is the max height
         data = CSV.read_csv("cometlifthill.csv")
@@ -230,7 +249,7 @@ class TrackPart:
         file_name = CSV.write_csv(lifthill, pts, h, "lifthill")
         return X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name
 
-    # Loop with constant G-force (possibly need to fix)
+    # ========================== Loop with constant G-force (possibly need to fix) ==========================
     # Need to make it so that when the loop ends, it ends at the same height it started --> Y=0
     def loopCG_func(r, ngs):
         g = 9.8
@@ -314,37 +333,43 @@ class TrackPart:
     def rollup_func(h):
         return None
 
-    # Combines two track parts
-    def combine_tracks(part1, part2):
-        # Each part is a tuple of 13 elements
-        X1, Y1, Z1, Fx1, Fy1, Fz1, Lx1, Ly1, Lz1, Nx1, Ny1, Nz1, _ = part1
-        X2, Y2, Z2, Fx2, Fy2, Fz2, Lx2, Ly2, Lz2, Nx2, Ny2, Nz2, _ = part2
+    # ========================== Combine multiple track parts into one (done) ==========================
+    # Combines multiple track parts into one
+    def combine_tracks(*parts):
+        # Handles empty inputs
+        if not parts:
+            return None
+        
+        X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, _ = parts[0]
 
-        X2 = X2 + X1[-1]
-        # Combine
-        X = np.concatenate((X1, X2))
-        Y = np.concatenate((Y1, Y2))
-        Z = np.concatenate((Z1, Z2))
-        Fx = np.concatenate((Fx1, Fx2))
-        Fy = np.concatenate((Fy1, Fy2))
-        Fz = np.concatenate((Fz1, Fz2))
-        Lx = np.concatenate((Lx1, Lx2))
-        Ly = np.concatenate((Ly1, Ly2))
-        Lz = np.concatenate((Lz1, Lz2))
-        Nx = np.concatenate((Nx1, Nx2))
-        Ny = np.concatenate((Ny1, Ny2))
-        Nz = np.concatenate((Nz1, Nz2))
+        # Iterate through remaining parts and concatenate
+        for part in parts[1:]:
+            X2, Y2, Z2, Fx2, Fy2, Fz2, Lx2, Ly2, Lz2, Nx2, Ny2, Nz2, _ = part
+
+            # Offset the new part to connect to the previous part
+            X2 += X[-1] - X2[0]
+            Y2 += Y[-1] - Y2[0]
+            Z2 += Z[-1] - Z2[0]
+
+            # Combine the parts
+            X = np.concatenate([X, X2])
+            Y = np.concatenate([Y, Y2])
+            Z = np.concatenate([Z, Z2])
+            Fx = np.concatenate([Fx, Fx2])
+            Fy = np.concatenate([Fy, Fy2])
+            Fz = np.concatenate([Fz, Fz2])
+            Lx = np.concatenate([Lx, Lx2])
+            Ly = np.concatenate([Ly, Ly2])
+            Lz = np.concatenate([Lz, Lz2])
+            Nx = np.concatenate([Nx, Nx2])
+            Ny = np.concatenate([Ny, Ny2])
+            Nz = np.concatenate([Nz, Nz2])
 
         pts = len(X)
-        data = np.column_stack((np.arange(1, pts + 1), X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz))
-        file_name = CSV.write_csv(data, pts, "combined", "combined_track")
+        data = np.column_stack((np.arange(1, pts+1), X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz))
+        file_name = CSV.write_csv(data, pts, "combined_track")
 
         return X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name
-
-
-
-
-
 
 
 

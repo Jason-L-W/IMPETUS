@@ -22,7 +22,7 @@ class TrackPart:
         # Scales the track based on your input scale
         track_data[:, 1:4] = track_data[:, 1:4] * scale / np.max(data[:, 2])
 
-        X, Y, Z = track_data[:, 1] / 3, track_data[:, 2], track_data[:, 3]
+        X, Y, Z = track_data[:, 1] * 3, track_data[:, 2], track_data[:, 3]
         Fx, Fy, Fz = track_data[:, 4], track_data[:, 5], track_data[:, 6]
         Lx, Ly, Lz = track_data[:, 7], track_data[:, 8], track_data[:, 9]
         Nx, Ny, Nz = track_data[:, 10], track_data[:, 11], track_data[:, 12]
@@ -78,7 +78,7 @@ class TrackPart:
         # Scales the track based on your input height
         cobraroll[:, 1:4] = cobraroll[:, 1:4] * h / np.max(data[:, 2])
         
-        X, Y, Z = cobraroll[:, 1] / 3, cobraroll[:, 2], cobraroll[:, 3]
+        X, Y, Z = cobraroll[:, 1] * 3, cobraroll[:, 2], cobraroll[:, 3]
         Fx, Fy, Fz = cobraroll[:, 4], cobraroll[:, 5], cobraroll[:, 6]
         Lx, Ly, Lz = cobraroll[:, 7], cobraroll[:, 8], cobraroll[:, 9]
         Nx, Ny, Nz = cobraroll[:, 10], cobraroll[:, 11], cobraroll[:, 12]
@@ -122,12 +122,14 @@ class TrackPart:
         Z = np.concatenate([Z1, Z2, Z3])
         Phi = np.concatenate([Phi1, Phi2, Phi3])
 
+        # Calculate Normal Vectors
         dX = np.concatenate(([X[0]], X[1:] - X[:-1]))[:, np.newaxis]
         dY = np.concatenate(([Y[0]], Y[1:] - Y[:-1]))[:, np.newaxis]
         dZ = np.concatenate(([Z[0]], Z[1:] - Z[:-1]))[:, np.newaxis]
         dS = np.sqrt(dX**2 + dY**2 + dZ**2)
         dXZ = np.sqrt(dX**2 + dZ**2)
 
+        # Initial Normal Vectors before rotation
         N = np.zeros((3, len(X)))
         N[1, :] = np.cos(np.deg2rad(Phi))
         N[2, :] = -np.sin(np.deg2rad(Phi))
@@ -135,9 +137,7 @@ class TrackPart:
         Ry = np.zeros((3, 3, len(X)))
         Rz = np.zeros((3, 3, len(X)))
 
-        # Build rotation matrices
-        eps = 1e-8 # Used to prevent division by zero
-
+        # Rotation matrices
         for i in range(len(X)):
             Ry[0, :, i] = [dX[i,0] / (dXZ[i,0]), 0, -dZ[i,0] / (dXZ[i,0])]
             Ry[1, :, i] = [0, 1, 0]
@@ -187,7 +187,7 @@ class TrackPart:
 
         return X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name
 
-    # TODO
+    # ========================== Helix track part (TODO) ==========================
     def helix_func(h):
         R = 2 * h
 
@@ -332,9 +332,8 @@ class TrackPart:
     def rollup_func(h):
         return None
 
-    # ========================== Combine multiple track parts into one (done) ==========================
+    # ========================== Combine multiple track parts into one (TODO need to fix) ==========================
     # Combines multiple track parts into one
-    # TODO Need to test and fix --> need to make them floats so that they can be concatenated properly
     def combine_tracks(*parts):
         if not parts:
             return None

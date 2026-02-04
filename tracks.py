@@ -139,13 +139,19 @@ class TrackPart:
 
         # Rotation matrices
         for i in range(len(X)):
-            Ry[0, :, i] = [dX[i,0] / (dXZ[i,0]), 0, -dZ[i,0] / (dXZ[i,0])]
-            Ry[1, :, i] = [0, 1, 0]
-            Ry[2, :, i] = [dZ[i,0] / (dXZ[i,0]), 0, dX[i,0] / (dXZ[i,0])]
+            if dXZ[i, 0] > 1e-9:
+                Ry[0, :, i] = [dX[i,0] / (dXZ[i,0]), 0, -dZ[i,0] / (dXZ[i,0])]
+                Ry[1, :, i] = [0, 1, 0]
+                Ry[2, :, i] = [dZ[i,0] / (dXZ[i,0]), 0, dX[i,0] / (dXZ[i,0])]
+            else:
+                Ry[:, :, i] = np.eye(3)
 
-            Rz[0, :, i] = [dXZ[i,0] / (dS[i,0]), -dY[i,0] / (dS[i,0]), 0]
-            Rz[1, :, i] = [dY[i,0] / (dS[i,0]),  dXZ[i,0] / (dS[i,0]), 0]
-            Rz[2, :, i] = [0, 0, 1]
+            if dS[i, 0] > 1e-9:
+                Rz[0, :, i] = [dXZ[i,0] / (dS[i,0]), -dY[i,0] / (dS[i,0]), 0]
+                Rz[1, :, i] = [dY[i,0] / (dS[i,0]),  dXZ[i,0] / (dS[i,0]), 0]
+                Rz[2, :, i] = [0, 0, 1]
+            else:
+                Rz[:, :, i] = np.eye(3)
 
         # Apply rotations to N
         for i in range(len(X)):
@@ -340,33 +346,33 @@ class TrackPart:
 
         # Flatten the first part
         X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, _ = parts[0]
-        X = X.astype(float)
-        Y = Y.astype(float)
-        Z = Z.astype(float)
-        Fx = Fx.astype(float)
-        Fy = Fy.astype(float)
-        Fz = Fz.astype(float)
-        Lx = Lx.astype(float)
-        Ly = Ly.astype(float)
-        Lz = Lz.astype(float)
-        Nx = Nx.astype(float)
-        Ny = Ny.astype(float)
-        Nz = Nz.astype(float)
+        X = X.ravel().astype(float)
+        Y = Y.ravel().astype(float)
+        Z = Z.ravel().astype(float)
+        Fx = Fx.ravel().astype(float)
+        Fy = Fy.ravel().astype(float)
+        Fz = Fz.ravel().astype(float)
+        Lx = Lx.ravel().astype(float)
+        Ly = Ly.ravel().astype(float)
+        Lz = Lz.ravel().astype(float)
+        Nx = Nx.ravel().astype(float)
+        Ny = Ny.ravel().astype(float)
+        Nz = Nz.ravel().astype(float)
 
         for part in parts[1:]:
             X2, Y2, Z2, Fx2, Fy2, Fz2, Lx2, Ly2, Lz2, Nx2, Ny2, Nz2, _ = part
-            X2 = X2.astype(float)
-            Y2 = Y2.astype(float)
-            Z2 = Z2.astype(float)
-            Fx2 = Fx2.astype(float)
-            Fy2 = Fy2.astype(float)
-            Fz2 = Fz2.astype(float)
-            Lx2 = Lx2.astype(float)
-            Ly2 = Ly2.astype(float)
-            Lz2 = Lz2.astype(float)
-            Nx2 = Nx2.astype(float)
-            Ny2 = Ny2.astype(float)
-            Nz2 = Nz2.astype(float)
+            X2 = X2.ravel().astype(float)
+            Y2 = Y2.ravel().astype(float)
+            Z2 = Z2.ravel().astype(float)
+            Fx2 = Fx2.ravel().astype(float)
+            Fy2 = Fy2.ravel().astype(float)
+            Fz2 = Fz2.ravel().astype(float)
+            Lx2 = Lx2.ravel().astype(float)
+            Ly2 = Ly2.ravel().astype(float)
+            Lz2 = Lz2.ravel().astype(float)
+            Nx2 = Nx2.ravel().astype(float)
+            Ny2 = Ny2.ravel().astype(float)
+            Nz2 = Nz2.ravel().astype(float)
 
 
             # Offset the new part to connect smoothly

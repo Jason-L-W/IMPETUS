@@ -8,6 +8,8 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 import matplotlib.pyplot as plt
 
+import tracks
+import build
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -23,17 +25,13 @@ class MainWindow(QMainWindow):
         # Title
         title = QLabel("IMPETUS RollerCoaster Track Builder")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title.setStyleSheet(
-            "color: white; font-size: 24px; font-weight: bold;"
-            "padding: 10px; background-color: #34495e; border-radius: 10px;"
-        )
+        title.setStyleSheet("color: white; font-size: 24px; font-weight: bold; padding: 10px; background-color: #34495e; border-radius: 10px;")
         title.setFixedHeight(60)
         self.layout.addWidget(title)
 
         # Spacer Item
         self.assembly_spacer = QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
 
-        # ================================================================================================================
         # Track Panel (Assembly and Visualization)
         self.track_widget = QWidget()
         self.track_widget.setStyleSheet("background-color: green; border-radius: 10px; padding: 10px;")
@@ -48,6 +46,7 @@ class MainWindow(QMainWindow):
 
     # Assembly/Visualization Panels and Button
     # ================================================================================================================
+    # Assembly Panel
     def assembly_panel(self):
         # Assembly Panel
         self.assembly_widget = QWidget()
@@ -180,26 +179,55 @@ class MainWindow(QMainWindow):
     # Start Assembly Button Action
     def start_assembly(self):
         data = []
+        # Obtain track data from user inputs
         for track, length in self.tracks:
-            if track.currentText() == "" or length.text() == "":
-                QMessageBox.warning(
-                    self,
-                    "Incomplete Entry",
-                    "Please select a track type and enter a length for all tracks."
-                )
+            track_type = track.currentText()
+            track_length = length.text()
+
+            # Validate inputs
+            if track.currentText() == "" or track_length == "":
+                QMessageBox.warning(self, "Incomplete Entry", "Please select a track type and enter a length for all tracks.")
                 return
-            else:
-                data.append(f"{track.currentText()} - Length: {length.text()}")
+            # Validate length input
+            try:
+                length_value = float(track_length)
+            except ValueError:
+                QMessageBox.warning(self, "Invalid Length", f"Please enter a valid number for the length of the {track_type} track.")
+                return
+
+            # Need to add conditionals for different track types and also make sure some tracks can't follow others
+            # Maybe also make sure their is a minimum length for certain track types
             
-        print(data)  # For debugging purposes
+            # Generate track segment based on type and length
+            if track_type == "Camelback":
+                segment = tracks.TrackPart.camelback_func(length_value)
+            elif track_type == "Cobral Roll":
+                segment = tracks.TrackPart.cobrarollCG_func(length_value)
+            elif track_type == "Corkscrew":
+                segment = tracks.TrackPart.corkscrew_func(length_value)
+            else:
+                QMessageBox.warning(self, "Unknown Track", f"Track type {track_type} is not recognized.")
+                return
+            # Append segment to data list
+            data.append(segment)
 
-        QMessageBox.information(
-            self,
-            "Track Assembly",
-            "Tracks:\n" + ("\n".join(data) if data else "No tracks defined.")
-        )
+        # Check if there are valid tracks to assemble
+        if not data:
+            QMessageBox.warning(self, "No Tracks", "No valid tracks to assemble.")
+            return
+        # Assemble and visualize tracks
+        try:
+            wait = QMessageBox()
+            wait.setWindowTitle("Assembling Tracks")
+            wait.setText("Assembling tracks, please wait...")
+            
+            combined_track = tracks.TrackPart.combine_tracks(*data)
+            build.plot(combined_track) # For now it is seperate, but will integrate into UI later
+            wait.close()
 
-    
+        except Exception as e:
+            QMessageBox.critical(self, "Assembly Error", f"An error occurred during assembly: {str(e)}")
+
 
 
 

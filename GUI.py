@@ -11,9 +11,12 @@ import matplotlib.pyplot as plt
 import tracks
 import build
 
-# Magic numbers for track limits and initial tracks, can adjust as needed
-AVAILABLE_TRACKS = ["Straight", "Camelback", "Cobral Roll", "Corkscrew", "Loop de Loop"]
+# Magic numbers for track types and sections, can adjust later to be more specific with track types and options
 SECTIONS = ["Starts", "Thrills", "Turns", "Ends"]
+STARTS = ["Launch", "Lift Hill", "Rollback"]
+THRILLS = ["Loop", "Camelback", "Corkscrew"]
+TURNS = ["Cobral Roll", "Horseshoe", "Helix"]
+ENDS = ["Brake", "Rollup"]
 INITAL_TRACKS = 1
 
 class MainWindow(QMainWindow):
@@ -94,22 +97,23 @@ class MainWindow(QMainWindow):
             )
             label.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
-            # Add Track Button
+            # Add Track Button (add to the end of the section)
             add_track_button = QPushButton("+")
             add_track_button.setStyleSheet(
                 "background-color: #3498db; color: white; font-size: 16px;"
-                "padding: 8px; border-radius: 5px;"
+                "font-weight: bold; padding: 5px 8px; border-radius: 5px;"
             )
-            add_track_button.clicked.connect(lambda checked, s=section: self.create_track_row(section))
+            add_track_button.clicked.connect(lambda checked, s=section: self.create_track_row(s))
 
-            # Remove Track Button (for now just removes the last track added, can adjust later to remove specific tracks)
+            # Remove Track Button (remove from the end of the section)
             remove_track_button = QPushButton("-")
             remove_track_button.setStyleSheet(
                 "background-color: #e74c3c; color: white; font-size: 16px;"
-                "padding: 8px; border-radius: 5px;"
+                "font-weight: bold; padding: 5px 8px; border-radius: 5px;"
             )
-            remove_track_button.clicked.connect(lambda checked, s=section: self.remove_track_row(section))
+            remove_track_button.clicked.connect(lambda checked, s=section: self.remove_track_row(s))
             
+            # Add widgets to header layout
             header_layout.addWidget(label)
             header_layout.addStretch()
             header_layout.addWidget(add_track_button)
@@ -117,12 +121,12 @@ class MainWindow(QMainWindow):
 
             container_layout.addLayout(header_layout)
 
+            # Layout for track rows in each section
             rows_layout = QVBoxLayout()
             container_layout.addLayout(rows_layout)
 
             self.section_layouts[section] = rows_layout
             self.track_assembly_layout.addWidget(section_container)
-
 
             for _ in range(INITAL_TRACKS):
                 self.create_track_row(section)
@@ -197,7 +201,7 @@ class MainWindow(QMainWindow):
             return
         
         # Keeps track of number of tracks added and set a maximum amount of tracks
-        if len(self.tracks[section]) >= 10:
+        if len(self.tracks[section]) >= 3:
             QMessageBox.warning(self, "Limit Reached", "Maximum number of tracks has been reached for this section.")
             return
         
@@ -207,8 +211,16 @@ class MainWindow(QMainWindow):
 
         track_dropdown = QComboBox()
         track_dropdown.setPlaceholderText("Select Track Type")
-        track_dropdown.addItems(AVAILABLE_TRACKS)
 
+        if section == "Starts":
+            track_dropdown.addItems(STARTS)
+        elif section == "Thrills":
+            track_dropdown.addItems(THRILLS)
+        elif section == "Turns":
+            track_dropdown.addItems(TURNS)
+        elif section == "Ends":
+            track_dropdown.addItems(ENDS)
+        
         length_input = QLineEdit()
         length_input.setPlaceholderText("Track Length")
 
@@ -220,10 +232,14 @@ class MainWindow(QMainWindow):
         self.tracks[section].append(row_widget)
 
         # Connect change event to update options (Some tracks may need more options)
-        track_dropdown.currentIndexChanged.connect(self.update_track_options)
+        # track_dropdown.currentIndexChanged.connect(self.update_track_options)
 
     # Remove the last track row added (can adjust later to remove specific tracks)
     def remove_track_row(self, section):
+        if len(self.tracks[section]) == 1:
+            QMessageBox.warning(self, "Minimum Tracks", "At least one track must be present in this section.")
+            return
+        
         section_tracks = self.tracks.get(section, [])
 
         if section_tracks:
@@ -257,42 +273,46 @@ class MainWindow(QMainWindow):
     def start_assembly(self):
         data = []
         # Obtain track data from user inputs
-        for track, length in self.tracks:
-            track_type = track.currentText()
-            track_length = length.text()
+        for section in self.tracks:
+            for track_row in self.tracks[section]:
+                track = track_row.findChild(QComboBox)
+                length = track_row.findChild(QLineEdit)
 
-            # Validate inputs
-            if track.currentText() == "" or track_length == "":
-                QMessageBox.warning(self, "Incomplete Entry", "Please select a track type and enter a length for all tracks.")
-                return
-            # Validate length input
-            try:
-                length_value = float(track_length)
-            except ValueError:
-                QMessageBox.warning(self, "Invalid Length", f"Please enter a valid number for the length of the {track_type} track.")
-                return
+                track_type = track.currentText()
+                track_length = length.text()
 
-            # Need to add conditionals for different track types and also make sure some tracks can't follow others
-            # Maybe also make sure their is a minimum length for certain track types
-            
-            # Generate track segment based on type and length
-            # Here you can add more track types as needed
-            if track_type == "Camelback":
-                segment = tracks.TrackPart.camelback_func(length_value)
-            elif track_type == "Cobral Roll":
-                segment = tracks.TrackPart.cobrarollCG_func(length_value)
-            elif track_type == "Corkscrew":
-                segment = tracks.TrackPart.corkscrew_func(length_value)
-            elif track_type == "Straight":
-                segment = tracks.TrackPart.break_func(length_value)
-            elif track_type == "Loop de Loop":
-                # Need to fix this function to work properly
-                segment = tracks.TrackPart.loopCG_func(length_value, )
-            else:
-                QMessageBox.warning(self, "Unknown Track", f"Track type {track_type} is not recognized.")
-                return
-            # Append segment to data list
-            data.append(segment)
+                # Validate inputs
+                if track.currentText() == "" or track_length == "":
+                    QMessageBox.warning(self, "Incomplete Entry", "Please select a track type and enter a length for all tracks.")
+                    return
+                # Validate length input
+                try:
+                    length_value = float(track_length)
+                except ValueError:
+                    QMessageBox.warning(self, "Invalid Length", f"Please enter a valid number for the length of the {track_type} track.")
+                    return
+
+                # Need to add conditionals for different track types and also make sure some tracks can't follow others
+                # Maybe also make sure their is a minimum length for certain track types
+                
+                # Generate track segment based on type and length
+                # Here you can add more track types as needed
+                if track_type == "Camelback":
+                    segment = tracks.TrackPart.camelback_func(length_value)
+                elif track_type == "Cobral Roll":
+                    segment = tracks.TrackPart.cobrarollCG_func(length_value)
+                elif track_type == "Corkscrew":
+                    segment = tracks.TrackPart.corkscrew_func(length_value)
+                elif track_type == "Straight":
+                    segment = tracks.TrackPart.break_func(length_value)
+                elif track_type == "Loop de Loop":
+                    # Need to fix this function to work properly
+                    segment = tracks.TrackPart.loopCG_func(length_value, )
+                else:
+                    QMessageBox.warning(self, "Unknown Track", f"Track type {track_type} is not recognized.")
+                    return
+                # Append segment to data list
+                data.append(segment)
 
         # Check if there are valid tracks to assemble
         if not data:
@@ -312,7 +332,6 @@ class MainWindow(QMainWindow):
 
             wait.setText(f"Assembly Complete!\nCSV file generated: {file_name}")
             wait.close()
-
 
         except Exception as e:
             QMessageBox.critical(self, "Assembly Error", f"An error occurred during assembly: {str(e)}")

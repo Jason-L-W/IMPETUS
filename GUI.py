@@ -11,6 +11,11 @@ import matplotlib.pyplot as plt
 import tracks
 import build
 
+# Magic numbers for track limits and initial tracks, can adjust as needed
+AVAILABLE_TRACKS = ["Straight", "Camelback", "Cobral Roll", "Corkscrew", "Loop de Loop"]
+SECTIONS = ["Starts", "Thrills", "Turns", "Ends"]
+INITAL_TRACKS = 1
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -64,27 +69,63 @@ class MainWindow(QMainWindow):
         self.assembly_layout.addWidget(track_assembly_label)
         self.assembly_layout.addItem(self.assembly_spacer)
 
-        # Track Assembly Panel
+        # Track Assembly Panel (would include 4 sections: starts, thrills, turns, ends)
         self.track_assembly_widget = QWidget()
         self.track_assembly_widget.setStyleSheet("background-color: #ecf0f1; border-radius: 10px; padding: 10px;")
         self.assembly_layout.addWidget(self.track_assembly_widget)
         self.track_assembly_layout = QVBoxLayout(self.track_assembly_widget)
 
-        # Tracks List
-        self.tracks = []
+        # Tracks dictionary to keep track of tracks added in each section, can adjust later to be more specific with track types and options
+        self.section_layouts = {}
+        self.tracks = {section: [] for section in SECTIONS}
 
-        # Initial Tracks
-        for _ in range(3):
-            self.create_track_row()
+        for section in SECTIONS:
+            section_container = QWidget()
+            section_container.setStyleSheet("background-color: #bdc3c7; border-radius: 10px; padding: 10px;")
+            
+            container_layout = QVBoxLayout(section_container)
 
-        # Add Track Button
-        self.add_track_button = QPushButton("Add Track")
-        self.add_track_button.setStyleSheet(
-            "background-color: #3498db; color: white; font-size: 16px;"
-            "padding: 8px; border-radius: 5px;"
-        )
-        self.add_track_button.clicked.connect(self.create_track_row)
-        self.assembly_layout.addWidget(self.add_track_button)
+            # Header Row with Section Label and Add/Remove Buttons
+            header_layout = QHBoxLayout()
+            label = QLabel(section)
+            label.setStyleSheet(
+                "color: #2c3e50; font-size: 18px; background-color: #bdc3c7;"
+                "padding: 5px; border-radius: 5px;"
+            )
+            label.setAlignment(Qt.AlignmentFlag.AlignLeft)
+
+            # Add Track Button
+            add_track_button = QPushButton("+")
+            add_track_button.setStyleSheet(
+                "background-color: #3498db; color: white; font-size: 16px;"
+                "padding: 8px; border-radius: 5px;"
+            )
+            add_track_button.clicked.connect(lambda checked, s=section: self.create_track_row(section))
+
+            # Remove Track Button (for now just removes the last track added, can adjust later to remove specific tracks)
+            remove_track_button = QPushButton("-")
+            remove_track_button.setStyleSheet(
+                "background-color: #e74c3c; color: white; font-size: 16px;"
+                "padding: 8px; border-radius: 5px;"
+            )
+            remove_track_button.clicked.connect(lambda checked, s=section: self.remove_track_row(section))
+            
+            header_layout.addWidget(label)
+            header_layout.addStretch()
+            header_layout.addWidget(add_track_button)
+            header_layout.addWidget(remove_track_button)
+
+            container_layout.addLayout(header_layout)
+
+            rows_layout = QVBoxLayout()
+            container_layout.addLayout(rows_layout)
+
+            self.section_layouts[section] = rows_layout
+            self.track_assembly_layout.addWidget(section_container)
+
+
+            for _ in range(INITAL_TRACKS):
+                self.create_track_row(section)
 
         # Add Assembly Panel to Main Layout
         self.track_layout.addWidget(self.assembly_widget)
@@ -129,8 +170,6 @@ class MainWindow(QMainWindow):
         self.start_button.clicked.connect(self.start_assembly)
         self.layout.addWidget(self.start_button)
 
-
-
     # Functions
     # ================================================================================================================
     # Resize Event to adjust panel sizes
@@ -151,30 +190,68 @@ class MainWindow(QMainWindow):
 
         super().resizeEvent(event)
 
-    # Create a new track row in the assembly panel
-    def create_track_row(self):
-        # Keeps track of number of tracks added and set a maximum amount of tracks
-        track_counter = len(self.tracks) + 1
-        if track_counter > 10:
-            QMessageBox.warning(self, "Limit Reached", "Maximum number of tracks has been reached.")
+    # Create a new track row in the specified section with track type dropdown and length input, can adjust later to include more options for certain track types
+    def create_track_row(self, section):
+        if section not in self.tracks:
+            QMessageBox.warning(self, "Invalid Section", "The specified section does not exist.")
             return
+        
+        # Keeps track of number of tracks added and set a maximum amount of tracks
+        if len(self.tracks[section]) >= 10:
+            QMessageBox.warning(self, "Limit Reached", "Maximum number of tracks has been reached for this section.")
+            return
+        
+        # Create a new track row
+        row_widget = QWidget()
+        row_layout = QHBoxLayout(row_widget)
 
-        row = QHBoxLayout(self.track_assembly_widget)
+        track_dropdown = QComboBox()
+        track_dropdown.setPlaceholderText("Select Track Type")
+        track_dropdown.addItems(AVAILABLE_TRACKS)
 
-        track = QComboBox()
-        track.setPlaceholderText("Select Track Type")
-        track.addItems(["Camelback", "Cobral Roll", "Corkscrew"])
+        length_input = QLineEdit()
+        length_input.setPlaceholderText("Track Length")
 
-        length = QLineEdit()
-        length.setPlaceholderText("Track Length")
+        row_layout.addWidget(track_dropdown)
+        row_layout.addWidget(length_input)
 
-        row.addWidget(track)
-        row.addWidget(length)
-        row.addStretch()
+        target_layout = self.section_layouts[section]
+        target_layout.addWidget(row_widget)
+        self.tracks[section].append(row_widget)
 
-        index = self.track_assembly_layout.indexOf(self.assembly_spacer)
-        self.track_assembly_layout.insertLayout(index, row)
-        self.tracks.append((track, length))
+        # Connect change event to update options (Some tracks may need more options)
+        track_dropdown.currentIndexChanged.connect(self.update_track_options)
+
+    # Remove the last track row added (can adjust later to remove specific tracks)
+    def remove_track_row(self, section):
+        section_tracks = self.tracks.get(section, [])
+
+        if section_tracks:
+            row_widget = section_tracks.pop()
+            row_widget.deleteLater()
+
+
+    # Update track options based on selected track type
+    # Some tracks may need additional parameters (1 or 2)
+    def update_track_options(self):
+        selected = self.track.currentText()
+        if selected == "Loop de Loop":
+            g_force = QLineEdit()
+            g_force.setPlaceholderText("G-Force (default 4g)")
+            index = self.track_assembly_layout.indexOf(self.assembly_spacer)
+            self.track_assembly_layout.insertWidget(index, g_force)
+        elif selected == "Loop 2 R":
+            radius1 = QLineEdit()
+            radius1.setPlaceholderText("Radius")
+            index = self.track_assembly_layout.indexOf(self.assembly_spacer)
+            self.track_assembly_layout.insertWidget(index, radius1)
+        else:
+            # length = QLineEdit()
+            # length.setPlaceholderText("Track Length")
+            # index = self.track_assembly_layout.indexOf(self.assembly_spacer)
+            # self.track_assembly_layout.insertWidget(index, length)
+            pass
+
 
     # Start Assembly Button Action
     def start_assembly(self):
@@ -199,12 +276,18 @@ class MainWindow(QMainWindow):
             # Maybe also make sure their is a minimum length for certain track types
             
             # Generate track segment based on type and length
+            # Here you can add more track types as needed
             if track_type == "Camelback":
                 segment = tracks.TrackPart.camelback_func(length_value)
             elif track_type == "Cobral Roll":
                 segment = tracks.TrackPart.cobrarollCG_func(length_value)
             elif track_type == "Corkscrew":
                 segment = tracks.TrackPart.corkscrew_func(length_value)
+            elif track_type == "Straight":
+                segment = tracks.TrackPart.break_func(length_value)
+            elif track_type == "Loop de Loop":
+                # Need to fix this function to work properly
+                segment = tracks.TrackPart.loopCG_func(length_value, )
             else:
                 QMessageBox.warning(self, "Unknown Track", f"Track type {track_type} is not recognized.")
                 return
@@ -223,7 +306,13 @@ class MainWindow(QMainWindow):
             
             combined_track = tracks.TrackPart.combine_tracks(*data)
             build.plot(combined_track) # For now it is seperate, but will integrate into UI later
+
+            # Used later to display total length, total height, etc.
+            X,Y,Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name = combined_track
+
+            wait.setText(f"Assembly Complete!\nCSV file generated: {file_name}")
             wait.close()
+
 
         except Exception as e:
             QMessageBox.critical(self, "Assembly Error", f"An error occurred during assembly: {str(e)}")

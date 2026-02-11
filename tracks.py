@@ -256,7 +256,7 @@ class TrackPart:
 
     # ========================== Loop with constant G-force (possibly need to fix) ==========================
     # Need to make it so that when the loop ends, it ends at the same height it started --> Y=0
-    def loopCG_func(r, ngs):
+    def loopCG_func(r, ngs = 4):
         g = 9.8
         H = ((ngs - 1) * r) / 2
         dt = 0.01
@@ -338,7 +338,7 @@ class TrackPart:
     def rollup_func(h):
         return None
 
-    # ========================== Combine multiple track parts into one (TODO need to fix) ==========================
+    # ========================== Combine multiple track parts into one (Done) ==========================
     # Combines multiple track parts into one
     def combine_tracks(*parts):
         if not parts:

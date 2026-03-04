@@ -32,7 +32,7 @@ class TrackPart:
         return X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name
 
     # ========================== Break track part (done) ==========================
-    def break_func(L):
+    def brake_func(L):
         X = np.arange(0, L+1, 1)
         pts = len(X)
 
@@ -345,7 +345,8 @@ class TrackPart:
             return None
 
         # Flatten the first part
-        X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, _ = parts[0]
+        X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, _ = parts[0]["arrays"]
+        
         X = X.ravel().astype(float)
         Y = Y.ravel().astype(float)
         Z = Z.ravel().astype(float)
@@ -360,7 +361,7 @@ class TrackPart:
         Nz = Nz.ravel().astype(float)
 
         for part in parts[1:]:
-            X2, Y2, Z2, Fx2, Fy2, Fz2, Lx2, Ly2, Lz2, Nx2, Ny2, Nz2, _ = part
+            X2, Y2, Z2, Fx2, Fy2, Fz2, Lx2, Ly2, Lz2, Nx2, Ny2, Nz2, _ = part["arrays"]
             X2 = X2.ravel().astype(float)
             Y2 = Y2.ravel().astype(float)
             Z2 = Z2.ravel().astype(float)
@@ -374,6 +375,19 @@ class TrackPart:
             Ny2 = Ny2.ravel().astype(float)
             Nz2 = Nz2.ravel().astype(float)
 
+            if part["is_end"]:
+                X2 = X2[::-1]
+                Y2 = Y2[::-1]
+                Z2 = Z2[::-1]
+
+                Fx2 = -Fx2[::-1]
+                Fy2 = -Fy2[::-1]
+                Fz2 = -Fz2[::-1]
+                Lx2 = -Lx2[::-1]
+                Ly2 = -Ly2[::-1]
+                Lz2 = -Lz2[::-1]
+
+                # Normal vectors is reserved, so we don't need to reverse them
 
             # Offset the new part to connect smoothly
             X2 += X[-1] - X2[0]

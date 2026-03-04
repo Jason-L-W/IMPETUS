@@ -13,11 +13,34 @@ import build
 
 # Magic numbers for track types and sections, can adjust later to be more specific with track types and options
 SECTIONS = ["Starts", "Thrills", "Turns", "Ends"]
-STARTS = ["Launch", "Lift Hill", "Rollback"]
+STARTS = ["Launch", "Lift Hill[x]", "Rollback[x]"]
 THRILLS = ["Loop", "Camelback", "Corkscrew"]
-TURNS = ["Cobral Roll", "Horseshoe", "Helix"]
-ENDS = ["Brake", "Rollup"]
+TURNS = ["Cobral Roll", "Horseshoe[x]", "Helix[x]"]
+ENDS = ["Brake", "Rollup[x]"]
+ALL_TRACKS = STARTS + THRILLS + TURNS + ENDS
 INITAL_TRACKS = 1
+
+track_function_map = {
+    # Starts
+    "Launch": tracks.TrackPart.brake_func,
+    "Lift Hill[x]": tracks.TrackPart.lifthill_func,
+    "Rollback[x]": tracks.TrackPart.rollback_func,
+
+    # Thrills
+    "Loop": tracks.TrackPart.loopCG_func,
+    "Camelback": tracks.TrackPart.camelback_func,
+    "Corkscrew": tracks.TrackPart.corkscrew_func,
+
+    # Turns
+    "Cobral Roll": tracks.TrackPart.cobrarollCG_func,
+    "Horseshoe[x]": tracks.TrackPart.horseshoe_func,
+    "Helix[x]": tracks.TrackPart.helix_func,
+
+    # Ends
+    "Brake": tracks.TrackPart.brake_func,
+    "Rollup[x]": tracks.TrackPart.rollup_func
+
+}
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -128,7 +151,10 @@ class MainWindow(QMainWindow):
             self.section_layouts[section] = rows_layout
             self.track_assembly_layout.addWidget(section_container)
 
+            # Certain track types can have no more than 1 track in a section
             for _ in range(INITAL_TRACKS):
+                if section == "Turns" and len(self.tracks[section]) >= 1:
+                    break
                 self.create_track_row(section)
 
         # Add Assembly Panel to Main Layout
@@ -196,8 +222,14 @@ class MainWindow(QMainWindow):
 
     # Create a new track row in the specified section with track type dropdown and length input, can adjust later to include more options for certain track types
     def create_track_row(self, section):
+        # Validate section
         if section not in self.tracks:
             QMessageBox.warning(self, "Invalid Section", "The specified section does not exist.")
+            return
+        
+        # Limit the number of tracks in the Turns section to 1
+        if section == "Turns" and len(self.tracks[section]) >= 1:
+            QMessageBox.warning(self, "Limit Reached", "Only one track can be added to the Turns section.")
             return
         
         # Keeps track of number of tracks added and set a maximum amount of tracks
@@ -246,7 +278,6 @@ class MainWindow(QMainWindow):
             row_widget = section_tracks.pop()
             row_widget.deleteLater()
 
-
     # Update track options based on selected track type
     # Some tracks may need additional parameters (1 or 2)
     def update_track_options(self):
@@ -269,6 +300,8 @@ class MainWindow(QMainWindow):
             pass
 
 
+    # Assembly
+    # ================================================================================================================
     # Start Assembly Button Action
     def start_assembly(self):
         data = []
@@ -282,9 +315,10 @@ class MainWindow(QMainWindow):
                 track_length = length.text()
 
                 # Validate inputs
-                if track.currentText() == "" or track_length == "":
+                if not track_type or not track_length:
                     QMessageBox.warning(self, "Incomplete Entry", "Please select a track type and enter a length for all tracks.")
                     return
+
                 # Validate length input
                 try:
                     length_value = float(track_length)
@@ -292,27 +326,20 @@ class MainWindow(QMainWindow):
                     QMessageBox.warning(self, "Invalid Length", f"Please enter a valid number for the length of the {track_type} track.")
                     return
 
-                # Need to add conditionals for different track types and also make sure some tracks can't follow others
-                # Maybe also make sure their is a minimum length for certain track types
-                
-                # Generate track segment based on type and length
-                # Here you can add more track types as needed
-                if track_type == "Camelback":
-                    segment = tracks.TrackPart.camelback_func(length_value)
-                elif track_type == "Cobral Roll":
-                    segment = tracks.TrackPart.cobrarollCG_func(length_value)
-                elif track_type == "Corkscrew":
-                    segment = tracks.TrackPart.corkscrew_func(length_value)
-                elif track_type == "Straight":
-                    segment = tracks.TrackPart.break_func(length_value)
-                elif track_type == "Loop de Loop":
-                    # Need to fix this function to work properly
-                    segment = tracks.TrackPart.loopCG_func(length_value, )
-                else:
-                    QMessageBox.warning(self, "Unknown Track", f"Track type {track_type} is not recognized.")
-                    return
-                # Append segment to data list
-                data.append(segment)
+                # Check for valid track type and build the track segment
+                if track_type in ALL_TRACKS:
+                    build_func = track_function_map.get(track_type)
+                    if build_func:
+                        segment = build_func(length_value)
+                        # Appends an array list of track type and its data list
+                        data.append({
+                            "type": track_type,
+                            "is_end": track_type in ENDS,
+                            "arrays": segment
+                        })
+                    else:
+                        QMessageBox.warning(self, "Unknown Track", f"Track type {track_type} is not recognized.")
+                        return
 
         # Check if there are valid tracks to assemble
         if not data:
@@ -325,10 +352,11 @@ class MainWindow(QMainWindow):
             wait.setText("Assembling tracks, please wait...")
             
             combined_track = tracks.TrackPart.combine_tracks(*data)
+            # print("Combined Track Data:", combined_track)  # Debugging line to check the combined track data
             build.plot(combined_track) # For now it is seperate, but will integrate into UI later
 
             # Used later to display total length, total height, etc.
-            X,Y,Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name = combined_track
+            X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name = combined_track
 
             wait.setText(f"Assembly Complete!\nCSV file generated: {file_name}")
             wait.close()

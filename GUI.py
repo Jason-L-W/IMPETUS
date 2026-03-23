@@ -3,13 +3,15 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QLabel, QWidget,
     QPushButton, QVBoxLayout, QHBoxLayout,
     QComboBox, QMessageBox, QLineEdit,
-    QSpacerItem, QSizePolicy, QScrollArea
+    QSpacerItem, QSizePolicy, QScrollArea, QStackedWidget
 )
 from PyQt6.QtCore import Qt
-import matplotlib.pyplot as plt
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.figure import Figure
 
 import tracks
 import build
+from time import sleep
 
 # Magic numbers for track types and sections, can adjust later to be more specific with track types and options
 SECTIONS = ["Starts", "Thrills", "Turns", "Ends"]
@@ -178,16 +180,22 @@ class MainWindow(QMainWindow):
         visual_layout.addWidget(visual_label)
         self.assembly_layout.addItem(self.assembly_spacer)
 
-        # Placeholder for 3D Visualization
-        placeholder_label = QLabel("3D Visualization Placeholder")
-        placeholder_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        placeholder_label.setStyleSheet(
-            "color: black; font-size: 16px;"
-            "background-color: #95a5a6; padding: 50px; border-radius: 10px;"
-        )
-        visual_layout.addWidget(placeholder_label)
+        self.view_stack = QStackedWidget()
+        visual_layout.addWidget(self.view_stack)
 
-        # Add Visual Panel to Main Layout
+        # Placeholder Label
+        self.placeholder_label = QLabel("Track visualization will appear here after assembly.")
+        self.placeholder_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.placeholder_label.setStyleSheet("color: #7f8c8d; font-size: 16px;")
+        self.placeholder_label.setWordWrap(True)
+        self.view_stack.addWidget(self.placeholder_label)
+
+        # Matplotlib Figure and Canvas for Visualization
+        self.figure = Figure()
+        self.canvas = FigureCanvas(self.figure)
+        self.ax3d = self.figure.add_subplot(111, projection='3d')
+
+        self.view_stack.addWidget(self.canvas)
         self.track_layout.addWidget(self.visual_widget)
 
     # Start Assembly Button
@@ -345,15 +353,18 @@ class MainWindow(QMainWindow):
         if not data:
             QMessageBox.warning(self, "No Tracks", "No valid tracks to assemble.")
             return
+        
         # Assemble and visualize tracks
         try:
-            wait = QMessageBox()
+            wait = QMessageBox(self)
             wait.setWindowTitle("Assembling Tracks")
             wait.setText("Assembling tracks, please wait...")
+            wait.show()
+            QApplication.processEvents()
             
             combined_track = tracks.TrackPart.combine_tracks(*data)
-            # print("Combined Track Data:", combined_track)  # Debugging line to check the combined track data
-            build.plot(combined_track) # For now it is seperate, but will integrate into UI later
+            # build.plot(combined_track) # For now it is seperate, but will integrate into UI later
+            self.update_visualization(combined_track)
 
             # Used later to display total length, total height, etc.
             X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name = combined_track
@@ -364,6 +375,23 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Assembly Error", f"An error occurred during assembly: {str(e)}")
 
+    # Visualization
+    def update_visualization(self, track_data):
+        self.view_stack.setCurrentIndex(1)  # Switch to the visualization view
+
+        X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name = track_data
+
+        self.ax3d.clear()
+        self.ax3d.plot3D(X, Y, Z, 'b-', label='Track Path')
+        self.ax3d.scatter(X + Nx, Y + Ny, Z + Nz, color='r', label='Normals')
+
+        self.ax3d.set_xlabel("X")
+        self.ax3d.set_ylabel("Y")
+        self.ax3d.set_zlabel("Z")
+        self.ax3d.set_title(f"Track Visualization: {file_name}")
+        self.ax3d.legend()
+
+        self.canvas.draw()
 
 
 

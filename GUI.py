@@ -3,7 +3,8 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QLabel, QWidget,
     QPushButton, QVBoxLayout, QHBoxLayout,
     QComboBox, QMessageBox, QLineEdit,
-    QSpacerItem, QSizePolicy, QScrollArea, QStackedWidget
+    QSpacerItem, QSizePolicy, QStackedWidget,
+    QTabWidget, QFormLayout, QSlider, QScrollArea
 )
 from PyQt6.QtCore import Qt
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
@@ -11,16 +12,13 @@ from matplotlib.figure import Figure
 
 import tracks
 import build
-from time import sleep
 
-# Magic numbers for track types and sections, can adjust later to be more specific with track types and options
-SECTIONS = ["Starts", "Thrills", "Turns", "Ends"]
+SECTIONS = ["Starts", "Thrills 1", "Turns", "Thrills 2", "Ends"]
 STARTS = ["Launch", "Lift Hill[x]", "Rollback[x]"]
 THRILLS = ["Loop", "Camelback", "Corkscrew"]
 TURNS = ["Cobral Roll", "Horseshoe[x]", "Helix[x]"]
 ENDS = ["Brake", "Rollup[x]"]
 ALL_TRACKS = STARTS + THRILLS + TURNS + ENDS
-INITAL_TRACKS = 1
 
 track_function_map = {
     # Starts
@@ -48,7 +46,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Track RollerCoaster")
-        self.setGeometry(100, 100, 800, 600)
+        self.setGeometry(100, 100, 1000, 680)
 
         self.main_widget = QWidget()
         self.main_widget.setStyleSheet("background-color: white;")
@@ -56,120 +54,77 @@ class MainWindow(QMainWindow):
         self.layout = QVBoxLayout(self.main_widget)
 
         # Title
-        title = QLabel("IMPETUS RollerCoaster Track Builder")
+        title = QLabel("IMPETUS Roller Coaster Track Builder")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title.setStyleSheet("color: white; font-size: 24px; font-weight: bold; padding: 10px; background-color: #34495e; border-radius: 10px;")
         title.setFixedHeight(60)
         self.layout.addWidget(title)
-
-        # Spacer Item
-        self.assembly_spacer = QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
 
         # Track Panel (Assembly and Visualization)
         self.track_widget = QWidget()
         self.track_widget.setStyleSheet("background-color: green; border-radius: 10px; padding: 10px;")
         self.track_layout = QHBoxLayout(self.track_widget)
 
-        # Assembly and Visualization Panels
-        self.assembly_panel()
-        self.visualization_panel()
-        self.layout.addWidget(self.track_widget)
-        # Add Start Assembly Button
-        self.start_assembly_button()
-
-    # Assembly/Visualization Panels and Button
-    # ================================================================================================================
-    # Assembly Panel
-    def assembly_panel(self):
-        # Assembly Panel
-        self.assembly_widget = QWidget()
-        self.assembly_widget.setStyleSheet("background-color: #34495e; border-radius: 10px; padding: 10px;")
-        self.assembly_layout = QVBoxLayout(self.assembly_widget)
-
-        # Assembly Label
-        track_assembly_label = QLabel("Track Assembly")
-        track_assembly_label.setStyleSheet(
-            "color: blue; font-size: 20px; background-color: white;"
-            "padding: 5px; border-radius: 5px;"
-        )
-        track_assembly_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        track_assembly_label.setFixedHeight(40)
-        self.assembly_layout.addWidget(track_assembly_label)
-        self.assembly_layout.addItem(self.assembly_spacer)
-
-        # Track Assembly Panel (would include 4 sections: starts, thrills, turns, ends)
-        self.track_assembly_widget = QWidget()
-        self.track_assembly_widget.setStyleSheet("background-color: #ecf0f1; border-radius: 10px; padding: 10px;")
-        self.assembly_layout.addWidget(self.track_assembly_widget)
-        self.track_assembly_layout = QVBoxLayout(self.track_assembly_widget)
-
-        # Tracks dictionary to keep track of tracks added in each section, can adjust later to be more specific with track types and options
+        # Assembly structures setup ahead of panel assignments
         self.section_layouts = {}
         self.tracks = {section: [] for section in SECTIONS}
 
+        self.assembly_panel()
+        self.visual_panel()
+        self.layout.addWidget(self.track_widget)
+        self.create_button()
+
         for section in SECTIONS:
-            section_container = QWidget()
-            section_container.setStyleSheet("background-color: #bdc3c7; border-radius: 10px; padding: 10px;")
+            self.track_type(section)
             
-            container_layout = QVBoxLayout(section_container)
+        self.switch_view_mode(0)
 
-            # Header Row with Section Label and Add/Remove Buttons
-            header_layout = QHBoxLayout()
-            label = QLabel(section)
-            label.setStyleSheet(
-                "color: #2c3e50; font-size: 18px; background-color: #bdc3c7;"
-                "padding: 5px; border-radius: 5px;"
-            )
-            label.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
-            # Add Track Button (add to the end of the section)
-            add_track_button = QPushButton("+")
-            add_track_button.setStyleSheet(
-                "background-color: #3498db; color: white; font-size: 16px;"
-                "font-weight: bold; padding: 5px 8px; border-radius: 5px;"
-            )
-            add_track_button.clicked.connect(lambda checked, s=section: self.create_track_row(s))
+    # ========================================================================
+    #                       Assembly Panels and Controls
+    # ========================================================================
+    def assembly_panel(self):
+        self.assembly_widget = QWidget()
+        self.assembly_widget.setStyleSheet("background-color: #34495e; border-radius: 10px; padding: 0px;")
+        self.assembly_layout = QVBoxLayout(self.assembly_widget)
 
-            # Remove Track Button (remove from the end of the section)
-            remove_track_button = QPushButton("-")
-            remove_track_button.setStyleSheet(
-                "background-color: #e74c3c; color: white; font-size: 16px;"
-                "font-weight: bold; padding: 5px 8px; border-radius: 5px;"
-            )
-            remove_track_button.clicked.connect(lambda checked, s=section: self.remove_track_row(s))
-            
-            # Add widgets to header layout
-            header_layout.addWidget(label)
-            header_layout.addStretch()
-            header_layout.addWidget(add_track_button)
-            header_layout.addWidget(remove_track_button)
+        track_assembly_label = QLabel("Track Assembly")
+        track_assembly_label.setStyleSheet("color: blue; font-size: 20px; background-color: white; padding: 5px; border-radius: 5px;")
+        track_assembly_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        track_assembly_label.setFixedHeight(40)
+        self.assembly_layout.addWidget(track_assembly_label)
 
-            container_layout.addLayout(header_layout)
+        selector_layout = QHBoxLayout()
+        selector_label = QLabel("View Mode: ")
+        selector_label.setStyleSheet("color: white; font-size: 14px; font-weight: bold;")
 
-            # Layout for track rows in each section
-            rows_layout = QVBoxLayout()
-            container_layout.addLayout(rows_layout)
+        self.setup_selector = QComboBox()
+        self.setup_selector.addItems(["Setup 1: All on 1 Page", "Setup 2: Tabbed View"])
+        self.setup_selector.setStyleSheet("QComboBox { background-color: white; color: #2c3e50; padding: 6px; border-radius: 5px; font-weight: bold; }")
+        selector_layout.addWidget(selector_label)
+        selector_layout.addWidget(self.setup_selector)
+        self.assembly_layout.addLayout(selector_layout)
 
-            self.section_layouts[section] = rows_layout
-            self.track_assembly_layout.addWidget(section_container)
+        self.assembly_stack = QStackedWidget()
+        self.assembly_layout.addWidget(self.assembly_stack)
 
-            # Certain track types can have no more than 1 track in a section
-            for _ in range(INITAL_TRACKS):
-                if section == "Turns" and len(self.tracks[section]) >= 1:
-                    break
-                self.create_track_row(section)
+        self.single_page_view() # Setup 1: All on 1 page
+        self.tabbed_view()      # Setup 2: Multiple pages
 
-        # Add Assembly Panel to Main Layout
-        self.track_layout.addWidget(self.assembly_widget)
+        self.setup_selector.currentIndexChanged.connect(self.switch_view_mode)
+        self.track_layout.addWidget(self.assembly_widget, 1)
+        
 
-    # Visualization Panel
-    def visualization_panel(self):
-        # Visual Panel
+    # ========================================================================
+    #                       Visual Panels and Controls
+    # ========================================================================
+    def visual_panel(self):
+        # Visual Widget
         self.visual_widget = QWidget()
         self.visual_widget.setStyleSheet("background-color: #bdc3c7; border-radius: 10px; padding: 10px;")
         visual_layout = QVBoxLayout(self.visual_widget)
 
-        # Visualization Label
+        # Visual Label
         visual_label = QLabel("Track Visualization")
         visual_label.setStyleSheet(
             "color: blue; font-size: 20px; background-color: white;"
@@ -178,140 +133,198 @@ class MainWindow(QMainWindow):
         visual_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         visual_label.setFixedHeight(40)
         visual_layout.addWidget(visual_label)
-        self.assembly_layout.addItem(self.assembly_spacer)
 
-        self.view_stack = QStackedWidget()
-        visual_layout.addWidget(self.view_stack)
+        self.visual_stack = QStackedWidget()
+        visual_layout.addWidget(self.visual_stack)
 
-        # Placeholder Label
+        # Placeholder Label (Inital State)
         self.placeholder_label = QLabel("Track visualization will appear here after assembly.")
         self.placeholder_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.placeholder_label.setStyleSheet("color: #7f8c8d; font-size: 16px;")
         self.placeholder_label.setWordWrap(True)
-        self.view_stack.addWidget(self.placeholder_label)
+        self.visual_stack.addWidget(self.placeholder_label)
 
         # Matplotlib Figure and Canvas for Visualization
         self.figure = Figure()
         self.canvas = FigureCanvas(self.figure)
         self.ax3d = self.figure.add_subplot(111, projection='3d')
 
-        self.view_stack.addWidget(self.canvas)
-        self.track_layout.addWidget(self.visual_widget)
+        self.visual_stack.addWidget(self.canvas)
+        self.track_layout.addWidget(self.visual_widget, 1)
 
-    # Start Assembly Button
-    def start_assembly_button(self):
-        self.start_button = QPushButton("Start Assembly")
-        self.start_button.setStyleSheet(
+
+    # ========================================================================
+    #                           Create Button
+    # ========================================================================
+    def create_button(self):
+        self.create_button = QPushButton("Create")
+        self.create_button.setStyleSheet(
             "background-color: #2ecc71; color: white; font-size: 18px;"
             "padding: 10px; border-radius: 10px;"
         )
-        self.start_button.clicked.connect(self.start_assembly)
-        self.layout.addWidget(self.start_button)
+        self.create_button.clicked.connect(self.start_generating)
+        self.layout.addWidget(self.create_button)      
 
-    # Functions
-    # ================================================================================================================
-    # Resize Event to adjust panel sizes
-    def resizeEvent(self, event):
-        screen = QApplication.primaryScreen()
-        screen_size = screen.availableGeometry()
-        screen_width = screen_size.width()
-        screen_height = screen_size.height()
 
-        self.assembly_widget.setMaximumWidth(min(self.width() // 2 - 40, screen_width // 2))
-        self.assembly_widget.setMaximumHeight(min(self.height() - 150, screen_height - 150))
-
-        self.visual_widget.setMaximumWidth(min(self.width() // 2 - 40, screen_width // 2))
-        self.visual_widget.setMaximumHeight(min(self.height() - 150, screen_height - 150))
-
-        self.setMaximumWidth(screen_width)
-        self.setMaximumHeight(screen_height)
-
-        super().resizeEvent(event)
-
-    # Create a new track row in the specified section with track type dropdown and length input, can adjust later to include more options for certain track types
-    def create_track_row(self, section):
-        # Validate section
-        if section not in self.tracks:
-            QMessageBox.warning(self, "Invalid Section", "The specified section does not exist.")
-            return
+    # ========================================================================
+    #                       Assembly Helper Functions
+    # ========================================================================
+    def single_page_view(self):
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setStyleSheet("border: none; background: transparent;")
         
-        # Limit the number of tracks in the Turns section to 1
-        if section == "Turns" and len(self.tracks[section]) >= 1:
-            QMessageBox.warning(self, "Limit Reached", "Only one track can be added to the Turns section.")
-            return
-        
-        # Keeps track of number of tracks added and set a maximum amount of tracks
-        if len(self.tracks[section]) >= 3:
-            QMessageBox.warning(self, "Limit Reached", "Maximum number of tracks has been reached for this section.")
-            return
-        
-        # Create a new track row
-        row_widget = QWidget()
-        row_layout = QHBoxLayout(row_widget)
+        self.single_page_widget = QWidget()
+        self.single_page_widget.setStyleSheet("background-color: #ecf0f1; border-radius: 10px; padding: 10px;")
+        self.single_page_main_layout = QVBoxLayout(self.single_page_widget)
+        self.single_page_main_layout.setContentsMargins(5, 5, 5, 5)
+        self.single_page_main_layout.setSpacing(10)
 
+        self.single_page_card_layouts = {}
+        for section in SECTIONS:
+            card = QWidget()
+            card.setStyleSheet("background-color: #ffffff; border-radius: 10px; margin-bottom: 10px; padding: 10px;")
+            
+            card_layout = QVBoxLayout(card)
+            card_layout.setContentsMargins(10, 10, 10, 10)
+            card_layout.setSpacing(6)
+            
+            title = QLabel(f"--- {section} ---")
+            title.setStyleSheet("color: #2c3e50; font-weight: bold; font-size: 14px;")
+            title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            card_layout.addWidget(title)
+            
+            self.single_page_card_layouts[section] = card_layout
+            self.single_page_main_layout.addWidget(card)
+            
+        self.single_page_main_layout.addStretch(1)
+        scroll_area.setWidget(self.single_page_widget)
+        self.assembly_stack.addWidget(scroll_area)
+
+    def tabbed_view(self):
+        self.assembly_tabs = QTabWidget()
+        self.assembly_tabs.setStyleSheet("""
+            QTabWidget::panel {background-color: #ecf0f1; border-radius: 10px; padding: 10px;}
+            QTabBar::tab {background-color: #2c3e50; color: white; padding: 8px 16px; border-top-left-radius: 6px; border-top-right-radius: 6px; margin-right: 2px;}
+            QTabBar::tab:selected {background-color: #ffffff; color: #2c3e50; font-weight: bold;}
+        """)
+
+        self.tab_layouts = {}
+        for section in SECTIONS:
+            tab_widget = QWidget()
+            tab_widget.setStyleSheet("background-color: #ffffff; border-radius: 10px; border-top-left-radius: 0px; padding: 10px;")
+            tab_layout = QVBoxLayout(tab_widget)
+            tab_layout.setContentsMargins(5, 5, 5, 5)
+            
+            self.tab_layouts[section] = tab_layout
+            self.assembly_tabs.addTab(tab_widget, section)
+            
+        self.assembly_stack.addWidget(self.assembly_tabs)
+
+    def switch_view_mode(self, index):
+        # The default is all on 1 page, but can change between them if the user wants
+
+        for section in SECTIONS:
+            if index == 0:
+                target_layout = self.single_page_card_layouts[section]
+            else:
+                target_layout = self.tab_layouts[section]
+                
+            # Re-setup the layout
+            for widget in self.tracks[section]:
+                widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+                target_layout.addWidget(widget)
+
+        # Flip the visible stack page
+        self.assembly_stack.setCurrentIndex(index)
+
+    def track_type(self, section):        
+        # Veritcal Dropdown Widget (Selecting Track Type)
+        col_widget = QWidget()
+        col_layout = QVBoxLayout(col_widget)
         track_dropdown = QComboBox()
         track_dropdown.setPlaceholderText("Select Track Type")
 
         if section == "Starts":
             track_dropdown.addItems(STARTS)
-        elif section == "Thrills":
+        elif section == "Thrills 1" or section == "Thrills 2":
             track_dropdown.addItems(THRILLS)
         elif section == "Turns":
             track_dropdown.addItems(TURNS)
         elif section == "Ends":
             track_dropdown.addItems(ENDS)
         
+        # Setup the Length Input Field
         length_input = QLineEdit()
         length_input.setPlaceholderText("Track Length")
 
-        row_layout.addWidget(track_dropdown)
-        row_layout.addWidget(length_input)
-
-        target_layout = self.section_layouts[section]
-        target_layout.addWidget(row_widget)
-        self.tracks[section].append(row_widget)
-
-        # Connect change event to update options (Some tracks may need more options)
-        # track_dropdown.currentIndexChanged.connect(self.update_track_options)
-
-    # Remove the last track row added (can adjust later to remove specific tracks)
-    def remove_track_row(self, section):
-        if len(self.tracks[section]) == 1:
-            QMessageBox.warning(self, "Minimum Tracks", "At least one track must be present in this section.")
-            return
+        # Setup the Slider
+        length_slider = QSlider(Qt.Orientation.Horizontal)
+        length_slider.setRange(1, 100)
         
-        section_tracks = self.tracks.get(section, [])
+        # Connects Slider to Line Input Field (Moving the slider updates the text)
+        length_slider.valueChanged.connect(lambda value: length_input.setText(str(value)))
 
-        if section_tracks:
-            row_widget = section_tracks.pop()
-            row_widget.deleteLater()
+        # Connects Line Input Field to Slider (Changing input value changes the slider position)
+        def sync_slider_from_text(text):
+            # Skip validation if box is empty
+            if not text:
+                return
 
-    # Update track options based on selected track type
-    # Some tracks may need additional parameters (1 or 2)
-    def update_track_options(self):
-        selected = self.track.currentText()
-        if selected == "Loop de Loop":
-            g_force = QLineEdit()
-            g_force.setPlaceholderText("G-Force (default 4g)")
-            index = self.track_assembly_layout.indexOf(self.assembly_spacer)
-            self.track_assembly_layout.insertWidget(index, g_force)
-        elif selected == "Loop 2 R":
-            radius1 = QLineEdit()
-            radius1.setPlaceholderText("Radius")
-            index = self.track_assembly_layout.indexOf(self.assembly_spacer)
-            self.track_assembly_layout.insertWidget(index, radius1)
-        else:
-            # length = QLineEdit()
-            # length.setPlaceholderText("Track Length")
-            # index = self.track_assembly_layout.indexOf(self.assembly_spacer)
-            # self.track_assembly_layout.insertWidget(index, length)
-            pass
+            try:
+                val = int(text)
+                # Makes sure that if the input value is not within the set range
+                if length_slider.minimum() <= val <= length_slider.maximum():
+                    length_slider.blockSignals(True)
+                    length_slider.setValue(val)
+                    length_slider.blockSignals(False)
+
+                # If not throws an error message
+                elif val < length_slider.minimum() or val > length_slider.maximum():
+                    QMessageBox.warning(
+                        self,
+                        "Invalid Number",
+                        f"Track length must be within the range of {length_slider.minimum()} - {length_slider.maximum()}"
+                    )
+
+            except ValueError:
+                pass
+
+        length_input.textChanged.connect(sync_slider_from_text)
+
+        # Add the widgets to the row layout
+        col_layout.addWidget(track_dropdown)
+        col_layout.addWidget(length_input)
+        col_layout.addWidget(length_slider)
+
+        self.tracks[section].append(col_widget)
 
 
-    # Assembly
-    # ================================================================================================================
-    # Start Assembly Button Action
-    def start_assembly(self):
+    # ========================================================================
+    #                       Visual Helper Functions
+    # ========================================================================
+    def update_visual(self, track_data):
+        self.visual_stack.setCurrentIndex(1)  # Switch to the visual view
+
+        X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name = track_data
+
+        self.ax3d.clear()
+        self.ax3d.plot3D(X, Y, Z, 'b-', label='Track Path')
+        self.ax3d.scatter(X + Nx, Y + Ny, Z + Nz, color='r', label='Normals')
+
+        self.ax3d.set_xlabel("X")
+        self.ax3d.set_ylabel("Y")
+        self.ax3d.set_zlabel("Z")
+        self.ax3d.set_title(f"Track Visualization: {file_name}")
+        self.ax3d.legend()
+
+        self.canvas.draw()
+
+
+    # ========================================================================
+    #                       Create Helper Functions
+    # ========================================================================
+    def start_generating(self):
         data = []
         # Obtain track data from user inputs
         for section in self.tracks:
@@ -363,8 +376,8 @@ class MainWindow(QMainWindow):
             QApplication.processEvents()
             
             combined_track = tracks.TrackPart.combine_tracks(*data)
-            # build.plot(combined_track) # For now it is seperate, but will integrate into UI later
-            self.update_visualization(combined_track)
+            #  build.plot(combined_track) # For now it is seperate, but will integrate into UI later
+            self.update_visual(combined_track)
 
             # Used later to display total length, total height, etc.
             X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name = combined_track
@@ -375,23 +388,6 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Assembly Error", f"An error occurred during assembly: {str(e)}")
 
-    # Visualization
-    def update_visualization(self, track_data):
-        self.view_stack.setCurrentIndex(1)  # Switch to the visualization view
-
-        X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name = track_data
-
-        self.ax3d.clear()
-        self.ax3d.plot3D(X, Y, Z, 'b-', label='Track Path')
-        self.ax3d.scatter(X + Nx, Y + Ny, Z + Nz, color='r', label='Normals')
-
-        self.ax3d.set_xlabel("X")
-        self.ax3d.set_ylabel("Y")
-        self.ax3d.set_zlabel("Z")
-        self.ax3d.set_title(f"Track Visualization: {file_name}")
-        self.ax3d.legend()
-
-        self.canvas.draw()
 
 
 

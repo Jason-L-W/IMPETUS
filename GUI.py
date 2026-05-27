@@ -100,7 +100,10 @@ class MainWindow(QMainWindow):
 
         self.setup_selector = QComboBox()
         self.setup_selector.addItems(["Setup 1: All on 1 Page", "Setup 2: Tabbed View"])
-        self.setup_selector.setStyleSheet("QComboBox { background-color: white; color: #2c3e50; padding: 6px; border-radius: 5px; font-weight: bold; }")
+        self.setup_selector.setStyleSheet("""
+            QComboBox { background-color: white; color: #2c3e50; padding: 6px; border-radius: 5px; font-weight: bold; }
+            QComboBox QAbstractItemView { background-color: white; border-radius: 5px; }
+                                          """)
         selector_layout.addWidget(selector_label)
         selector_layout.addWidget(self.setup_selector)
         self.assembly_layout.addLayout(selector_layout)
@@ -134,22 +137,47 @@ class MainWindow(QMainWindow):
         visual_label.setFixedHeight(40)
         visual_layout.addWidget(visual_label)
 
-        self.visual_stack = QStackedWidget()
-        visual_layout.addWidget(self.visual_stack)
+        # Visual Stack (Placeholder and Tab Widget)
+        self.visual_constent_layout = QVBoxLayout()
+        visual_layout.addLayout(self.visual_constent_layout)
 
         # Placeholder Label (Inital State)
         self.placeholder_label = QLabel("Track visualization will appear here after assembly.")
         self.placeholder_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.placeholder_label.setStyleSheet("color: #7f8c8d; font-size: 16px;")
         self.placeholder_label.setWordWrap(True)
-        self.visual_stack.addWidget(self.placeholder_label)
+        self.visual_constent_layout.addWidget(self.placeholder_label)
 
-        # Matplotlib Figure and Canvas for Visualization
-        self.figure = Figure()
-        self.canvas = FigureCanvas(self.figure)
-        self.ax3d = self.figure.add_subplot(111, projection='3d')
+        # Inital Tab Widget (Hidden until assembly is complete)
+        self.visual_tab_widget = QTabWidget()
+        self.visual_tab_widget.setStyleSheet("background-color: white; color: black;")
+        self.visual_tab_widget.hide()
+        self.visual_constent_layout.addWidget(self.visual_tab_widget)
 
-        self.visual_stack.addWidget(self.canvas)
+        # Tab 1: 3D Visualization
+        self.figure_3d = Figure()
+        self.canvas = FigureCanvas(self.figure_3d)
+        self.ax3d = self.figure_3d.add_subplot(111, projection='3d')
+        self.visual_tab_widget.addTab(self.canvas, "3D View")
+
+        # Tab 2: 2D Visualization (X-Axis)
+        self.figure_2d_x = Figure()
+        self.canvas_2d_x = FigureCanvas(self.figure_2d_x)
+        self.ax_x = self.figure_2d_x.add_subplot(111)
+        self.visual_tab_widget.addTab(self.canvas_2d_x, "2D View (XY)")
+
+        # Tab 3: 2D Visualization (Y-Axis)
+        self.figure_2d_y = Figure()
+        self.canvas_2d_y = FigureCanvas(self.figure_2d_y)
+        self.ax_y = self.figure_2d_y.add_subplot(111)
+        self.visual_tab_widget.addTab(self.canvas_2d_y, "2D View (XZ)")
+
+        # Tab 4: 2D Visualization (Z-Axis)
+        self.figure_2d_z = Figure()
+        self.canvas_2d_z = FigureCanvas(self.figure_2d_z)
+        self.ax_z = self.figure_2d_z.add_subplot(111)
+        self.visual_tab_widget.addTab(self.canvas_2d_z, "2D View (YZ)")
+
         self.track_layout.addWidget(self.visual_widget, 1)
 
 
@@ -183,13 +211,13 @@ class MainWindow(QMainWindow):
         self.single_page_card_layouts = {}
         for section in SECTIONS:
             card = QWidget()
-            card.setStyleSheet("background-color: #ffffff; border-radius: 10px; margin-bottom: 10px; padding: 10px;")
+            card.setStyleSheet("background-color: #ffffff; border-radius: 10px; margin-bottom: 2px; padding: 2px;")
             
             card_layout = QVBoxLayout(card)
             card_layout.setContentsMargins(10, 10, 10, 10)
-            card_layout.setSpacing(6)
+            card_layout.setSpacing(2)
             
-            title = QLabel(f"--- {section} ---")
+            title = QLabel(f"[{section}]")
             title.setStyleSheet("color: #2c3e50; font-weight: bold; font-size: 14px;")
             title.setAlignment(Qt.AlignmentFlag.AlignCenter)
             card_layout.addWidget(title)
@@ -197,7 +225,7 @@ class MainWindow(QMainWindow):
             self.single_page_card_layouts[section] = card_layout
             self.single_page_main_layout.addWidget(card)
             
-        self.single_page_main_layout.addStretch(1)
+        self.single_page_main_layout.addStretch()
         scroll_area.setWidget(self.single_page_widget)
         self.assembly_stack.addWidget(scroll_area)
 
@@ -304,21 +332,48 @@ class MainWindow(QMainWindow):
     #                       Visual Helper Functions
     # ========================================================================
     def update_visual(self, track_data):
-        self.visual_stack.setCurrentIndex(1)  # Switch to the visual view
+        self.placeholder_label.hide()  # Hide the placeholder label
+        self.visual_tab_widget.show()  # Show the visual widget
 
         X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name = track_data
 
+        # 3D View
         self.ax3d.clear()
         self.ax3d.plot3D(X, Y, Z, 'b-', label='Track Path')
         self.ax3d.scatter(X + Nx, Y + Ny, Z + Nz, color='r', label='Normals')
-
         self.ax3d.set_xlabel("X")
         self.ax3d.set_ylabel("Y")
         self.ax3d.set_zlabel("Z")
-        self.ax3d.set_title(f"Track Visualization: {file_name}")
+        self.ax3d.set_title(f"3D Track Visualization: {file_name}")
         self.ax3d.legend()
-
         self.canvas.draw()
+
+        # 2D View (XY View)
+        self.ax_x.clear()
+        self.ax_x.plot(X, Y, 'g-')
+        self.ax_x.set_xlabel("X")
+        self.ax_x.set_ylabel("Y")
+        self.ax_x.set_title("2D Track Visualization (XY View)")
+        self.ax_x.legend()
+        self.canvas_2d_x.draw()
+
+        # 2D View (XZ View)
+        self.ax_y.clear()
+        self.ax_y.plot(X, Z, 'o-')
+        self.ax_y.set_xlabel("X")
+        self.ax_y.set_ylabel("Z")
+        self.ax_y.set_title("2D Track Visualization (XZ View)")
+        self.ax_y.legend()
+        self.canvas_2d_y.draw()
+
+        # 2D View (YZ View)
+        self.ax_z.clear()
+        self.ax_z.plot(Y, Z, 's-')
+        self.ax_z.set_xlabel("Y")
+        self.ax_z.set_ylabel("Z")
+        self.ax_z.set_title("2D Track Visualization (YZ View)")
+        self.ax_z.legend()
+        self.canvas_2d_z.draw()
 
 
     # ========================================================================
@@ -376,7 +431,6 @@ class MainWindow(QMainWindow):
             QApplication.processEvents()
             
             combined_track = tracks.TrackPart.combine_tracks(*data)
-            #  build.plot(combined_track) # For now it is seperate, but will integrate into UI later
             self.update_visual(combined_track)
 
             # Used later to display total length, total height, etc.

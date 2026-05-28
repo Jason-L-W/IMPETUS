@@ -8,22 +8,29 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
+import numpy as np
 
 import tracks
 import build
 
-SECTIONS = ["Starts", "Thrills 1", "Turns", "Thrills 2", "Ends"]
-STARTS = ["Launch", "Lift Hill[x]", "Rollback[x]"]
-THRILLS = ["Loop", "Camelback", "Corkscrew"]
-TURNS = ["Cobral Roll", "Horseshoe[x]", "Helix[x]"]
-ENDS = ["Brake", "Rollup[x]"]
-ALL_TRACKS = STARTS + THRILLS + TURNS + ENDS
 
+
+# ========================================================================
+SECTIONS = ["Starts", "Thrills 1", "Turns", "Thrills 2", "Ends"]    # Defines the sections of the track assembly
+STARTS = ["Launch", "Lift Hill", "Rollback[x]"]                     # Defines the starting track types
+THRILLS = ["Loop", "Camelback", "Corkscrew"]                        # Defines the thrill track types
+TURNS = ["Cobral Roll", "Horseshoe[x]", "Helix[x]"]                 # Defines the turn track types
+ENDS = ["Brake", "Rollup[x]"]                                       # Defines the ending track types
+ALL_TRACKS = STARTS + THRILLS + TURNS + ENDS                        # Defines all track types for validation
+# ========================================================================
+
+# Maps track types to their corresponding functions in the tracks module
 track_function_map = {
     # Starts
     "Launch": tracks.TrackPart.brake_func,
-    "Lift Hill[x]": tracks.TrackPart.lifthill_func,
+    "Lift Hill": tracks.TrackPart.lifthill_func,
     "Rollback[x]": tracks.TrackPart.rollback_func,
 
     # Thrills
@@ -37,8 +44,8 @@ track_function_map = {
     "Helix[x]": tracks.TrackPart.helix_func,
 
     # Ends
-    "Brake": tracks.TrackPart.brake_func,
-    "Rollup[x]": tracks.TrackPart.rollup_func
+    "Brake": tracks.TrackPart.brake_func, # Using this 
+    "Rollup[x]": tracks.TrackPart.rollup_func # Has no return
 
 }
 
@@ -69,14 +76,15 @@ class MainWindow(QMainWindow):
         self.section_layouts = {}
         self.tracks = {section: [] for section in SECTIONS}
 
+        # Assembly and Visual Panels
         self.assembly_panel()
         self.visual_panel()
         self.layout.addWidget(self.track_widget)
         self.create_button()
 
+        # Setup the track assembly sections (Initialize each section)
         for section in SECTIONS:
             self.track_type(section)
-            
         self.switch_view_mode(0)
 
 
@@ -94,6 +102,7 @@ class MainWindow(QMainWindow):
         track_assembly_label.setFixedHeight(40)
         self.assembly_layout.addWidget(track_assembly_label)
 
+        # Setup Mode Selector (Dropdown to switch between single page and tabbed view)
         selector_layout = QHBoxLayout()
         selector_label = QLabel("View Mode: ")
         selector_label.setStyleSheet("color: white; font-size: 14px; font-weight: bold;")
@@ -155,10 +164,10 @@ class MainWindow(QMainWindow):
         self.visual_constent_layout.addWidget(self.visual_tab_widget)
 
         # Tab 1: 3D Visualization
-        self.figure_3d = Figure()
-        self.canvas = FigureCanvas(self.figure_3d)
+        self.figure_3d = Figure(figsize=(10, 4.2), dpi=100)
+        self.canvas_3d = FigureCanvas(self.figure_3d)
         self.ax3d = self.figure_3d.add_subplot(111, projection='3d')
-        self.visual_tab_widget.addTab(self.canvas, "3D View")
+        self.visual_tab_widget.addTab(self.canvas_3d, "3D View")
 
         # Tab 2: 2D Visualization (X-Axis)
         self.figure_2d_x = Figure()
@@ -285,10 +294,16 @@ class MainWindow(QMainWindow):
         # Setup the Length Input Field
         length_input = QLineEdit()
         length_input.setPlaceholderText("Track Length")
+        # ======= Test Value =======
+        length_input.setText("11")
+        # ==========================
 
         # Setup the Slider
         length_slider = QSlider(Qt.Orientation.Horizontal)
         length_slider.setRange(1, 100)
+        # ======= Test Value =======
+        length_slider.setValue(11)
+        # ==========================
         
         # Connects Slider to Line Input Field (Moving the slider updates the text)
         length_slider.valueChanged.connect(lambda value: length_input.setText(str(value)))
@@ -336,17 +351,33 @@ class MainWindow(QMainWindow):
         self.visual_tab_widget.show()  # Show the visual widget
 
         X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name = track_data
+        font_size = 8
 
         # 3D View
         self.ax3d.clear()
         self.ax3d.plot3D(X, Y, Z, 'b-', label='Track Path')
-        self.ax3d.scatter(X + Nx, Y + Ny, Z + Nz, color='r', label='Normals')
-        self.ax3d.set_xlabel("X")
-        self.ax3d.set_ylabel("Y")
-        self.ax3d.set_zlabel("Z")
-        self.ax3d.set_title(f"3D Track Visualization: {file_name}")
-        self.ax3d.legend()
-        self.canvas.draw()
+        self.ax3d.plot3D(X + Nx, Y + Ny, Z + Nz, 'r-', alpha=0.5, label='Normals')
+        self.ax3d.set_xlabel("X", fontsize=font_size)
+        self.ax3d.set_ylabel("Y", fontsize=font_size)
+        self.ax3d.set_zlabel("Z", fontsize=font_size)
+        self.ax3d.tick_params(axis='both', which='major', labelsize=font_size - 2)
+        self.ax3d.tick_params(axis='both', which='minor', labelsize=font_size - 4)
+        self.ax3d.set_title(f"3D Track Visualization: {file_name}", fontsize=font_size)
+        
+        x_range = np.max(X) - np.min(X)
+        y_range = np.max(Y) - np.min(Y)
+        z_range = np.max(Z) - np.min(Z)
+        max_range = max(x_range, y_range, z_range)
+        box_x = x_range / max_range
+        box_y = y_range / max_range
+        box_z = z_range / max_range
+        self.ax3d.set_box_aspect((box_x, box_y, box_z))  # Adjust aspect ratio for better visualization
+
+        self.ax3d.set_zoom = 6  # Adjust the distance for better visualization
+
+        self.figure_3d.subplots_adjust(left=0.1, right=0.9, top=0.9, bottom=0.1)  # Adjust subplot parameters for better layout
+        self.ax3d.legend(loc='upper right', fontsize=font_size - 2)
+        self.canvas_3d.draw()
 
         # 2D View (XY View)
         self.ax_x.clear()
@@ -354,7 +385,6 @@ class MainWindow(QMainWindow):
         self.ax_x.set_xlabel("X")
         self.ax_x.set_ylabel("Y")
         self.ax_x.set_title("2D Track Visualization (XY View)")
-        self.ax_x.legend()
         self.canvas_2d_x.draw()
 
         # 2D View (XZ View)
@@ -363,7 +393,6 @@ class MainWindow(QMainWindow):
         self.ax_y.set_xlabel("X")
         self.ax_y.set_ylabel("Z")
         self.ax_y.set_title("2D Track Visualization (XZ View)")
-        self.ax_y.legend()
         self.canvas_2d_y.draw()
 
         # 2D View (YZ View)
@@ -372,7 +401,6 @@ class MainWindow(QMainWindow):
         self.ax_z.set_xlabel("Y")
         self.ax_z.set_ylabel("Z")
         self.ax_z.set_title("2D Track Visualization (YZ View)")
-        self.ax_z.legend()
         self.canvas_2d_z.draw()
 
 
@@ -407,10 +435,12 @@ class MainWindow(QMainWindow):
                     build_func = track_function_map.get(track_type)
                     if build_func:
                         segment = build_func(length_value)
-                        # Appends an array list of track type and its data list
+
+                        # Appends to data an array list of track type and its data list
+                        # The data keeps tracks of section, type, and arrays for each track segment
                         data.append({
+                            "section": section,
                             "type": track_type,
-                            "is_end": track_type in ENDS,
                             "arrays": segment
                         })
                     else:
@@ -450,4 +480,3 @@ if __name__ == "__main__":
     window = MainWindow()
     window.show()
     app.exec()
-    test = 1

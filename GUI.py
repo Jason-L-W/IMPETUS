@@ -8,13 +8,10 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 import numpy as np
 
 import tracks
-import build
-
 
 
 # ========================================================================
@@ -124,6 +121,8 @@ class MainWindow(QMainWindow):
         self.tabbed_view()      # Setup 2: Multiple pages
 
         self.setup_selector.currentIndexChanged.connect(self.switch_view_mode)
+
+        # Add to the main layout, with a scale factor of 1 to make it smaller
         self.track_layout.addWidget(self.assembly_widget, 1)
         
 
@@ -164,30 +163,24 @@ class MainWindow(QMainWindow):
         self.visual_constent_layout.addWidget(self.visual_tab_widget)
 
         # Tab 1: 3D Visualization
-        self.figure_3d = Figure(figsize=(10, 4.2), dpi=100)
+        self.figure_3d = Figure(layout="constrained")  # Use constrained layout for better spacing
         self.canvas_3d = FigureCanvas(self.figure_3d)
         self.ax3d = self.figure_3d.add_subplot(111, projection='3d')
-        self.visual_tab_widget.addTab(self.canvas_3d, "3D View")
+        
+        tab_3d_page = QWidget()
+        tab_3d_layout = QVBoxLayout(tab_3d_page)
+        tab_3d_layout.setContentsMargins(0, 0, 0, 0)
+        tab_3d_layout.addWidget(self.canvas_3d)
+        self.visual_tab_widget.addTab(tab_3d_page, "3D View")
 
-        # Tab 2: 2D Visualization (X-Axis)
-        self.figure_2d_x = Figure()
-        self.canvas_2d_x = FigureCanvas(self.figure_2d_x)
-        self.ax_x = self.figure_2d_x.add_subplot(111)
-        self.visual_tab_widget.addTab(self.canvas_2d_x, "2D View (XY)")
+        # Tab 2: 2D Visualization (XY VS Z)
+        self.figure_2d_xyVz = Figure()
+        self.canvas_2d_xyVz = FigureCanvas(self.figure_2d_xyVz)
+        self.ax_xyVz = self.figure_2d_xyVz.add_subplot(111)
+        self.visual_tab_widget.addTab(self.canvas_2d_xyVz, "2D View (XY VS Z)")
 
-        # Tab 3: 2D Visualization (Y-Axis)
-        self.figure_2d_y = Figure()
-        self.canvas_2d_y = FigureCanvas(self.figure_2d_y)
-        self.ax_y = self.figure_2d_y.add_subplot(111)
-        self.visual_tab_widget.addTab(self.canvas_2d_y, "2D View (XZ)")
-
-        # Tab 4: 2D Visualization (Z-Axis)
-        self.figure_2d_z = Figure()
-        self.canvas_2d_z = FigureCanvas(self.figure_2d_z)
-        self.ax_z = self.figure_2d_z.add_subplot(111)
-        self.visual_tab_widget.addTab(self.canvas_2d_z, "2D View (YZ)")
-
-        self.track_layout.addWidget(self.visual_widget, 1)
+        # Add to the main layout, with a scale factor of 3 to make it larger
+        self.track_layout.addWidget(self.visual_widget, 3)
 
 
     # ========================================================================
@@ -346,24 +339,28 @@ class MainWindow(QMainWindow):
     # ========================================================================
     #                       Visual Helper Functions
     # ========================================================================
-    def update_visual(self, track_data):
+    def update_visual(self, track_data, xy_composition):
         self.placeholder_label.hide()  # Hide the placeholder label
         self.visual_tab_widget.show()  # Show the visual widget
 
         X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name = track_data
         font_size = 8
+        grid_padding = 5
 
-        # 3D View
+        # === 3D View ===
         self.ax3d.clear()
-        self.ax3d.plot3D(X, Y, Z, 'b-', label='Track Path')
-        self.ax3d.plot3D(X + Nx, Y + Ny, Z + Nz, 'r-', alpha=0.5, label='Normals')
+        # This might look weird, but the axes are swapped to make the visualization more intuitive (X, Z, Y) instead of (X, Y, Z).
+        # Right hand rule is used to determine the orientation of the axes, and this swap makes it easier to visualize the track in a more natural way.
+        # X is the forward direction axis, Y is the left direction axis, and Z is the upward direction axis.
+        self.ax3d.plot3D(X, Z, Y, 'b-', label='Track Path')
+        self.ax3d.plot3D(X + Nx, Z + Nz, Y + Ny, 'r-', alpha=0.4, label='Normals')
         self.ax3d.set_xlabel("X", fontsize=font_size)
         self.ax3d.set_ylabel("Y", fontsize=font_size)
         self.ax3d.set_zlabel("Z", fontsize=font_size)
         self.ax3d.tick_params(axis='both', which='major', labelsize=font_size - 2)
         self.ax3d.tick_params(axis='both', which='minor', labelsize=font_size - 4)
-        self.ax3d.set_title(f"3D Track Visualization: {file_name}", fontsize=font_size)
         
+        # Scale the 3D plot to fit the data better (A 1:1:1 aspect ratio for better visualization)
         x_range = np.max(X) - np.min(X)
         y_range = np.max(Y) - np.min(Y)
         z_range = np.max(Z) - np.min(Z)
@@ -371,38 +368,33 @@ class MainWindow(QMainWindow):
         box_x = x_range / max_range
         box_y = y_range / max_range
         box_z = z_range / max_range
-        self.ax3d.set_box_aspect((box_x, box_y, box_z))  # Adjust aspect ratio for better visualization
+        self.ax3d.set_box_aspect((box_x, box_z, box_y))  # Adjust aspect ratio for better visualization
 
-        self.ax3d.set_zoom = 6  # Adjust the distance for better visualization
+        self.ax3d.set_xlim(np.min(X) - grid_padding, np.max(X) + grid_padding)
+        self.ax3d.set_ylim(np.min(Z) - grid_padding, np.max(Z)+ grid_padding)
+        self.ax3d.set_zlim(np.min(Y) - grid_padding, np.max(Y) + grid_padding)
 
-        self.figure_3d.subplots_adjust(left=0.1, right=0.9, top=0.9, bottom=0.1)  # Adjust subplot parameters for better layout
-        self.ax3d.legend(loc='upper right', fontsize=font_size - 2)
+        self.ax3d.legend(loc='upper right', bbox_to_anchor=(1.0, 1.0), fontsize=font_size)
         self.canvas_3d.draw()
 
-        # 2D View (XY View)
-        self.ax_x.clear()
-        self.ax_x.plot(X, Y, 'g-')
-        self.ax_x.set_xlabel("X")
-        self.ax_x.set_ylabel("Y")
-        self.ax_x.set_title("2D Track Visualization (XY View)")
-        self.canvas_2d_x.draw()
+        # === 2D View (XY vs Z View) ===
+        # This is where the XY composition of the track is plotted in a 2D view, while still keeping the 3D view intact.
+        self.ax_xyVz.clear()
+        current_horizontal_offset = 0
+        for segment in xy_composition:
+            local_horizontal = segment["XY"]
+            Z_elevation = segment["Z"]
 
-        # 2D View (XZ View)
-        self.ax_y.clear()
-        self.ax_y.plot(X, Z, 'o-')
-        self.ax_y.set_xlabel("X")
-        self.ax_y.set_ylabel("Z")
-        self.ax_y.set_title("2D Track Visualization (XZ View)")
-        self.canvas_2d_y.draw()
+            global_2d_horizontal = local_horizontal + current_horizontal_offset
 
-        # 2D View (YZ View)
-        self.ax_z.clear()
-        self.ax_z.plot(Y, Z, 's-')
-        self.ax_z.set_xlabel("Y")
-        self.ax_z.set_ylabel("Z")
-        self.ax_z.set_title("2D Track Visualization (YZ View)")
-        self.canvas_2d_z.draw()
+            self.ax_xyVz.plot(global_2d_horizontal, Z_elevation)
+            current_horizontal_offset = global_2d_horizontal[-1]  # Update the offset for the next segment
 
+        self.ax_xyVz.set_aspect('equal')
+        self.ax_xyVz.set_xlabel("XY Composition", fontsize=font_size)
+        self.ax_xyVz.set_ylabel("Z Elevation", fontsize=font_size)
+        self.canvas_2d_xyVz.draw()
+        
 
     # ========================================================================
     #                       Create Helper Functions
@@ -460,8 +452,11 @@ class MainWindow(QMainWindow):
             wait.show()
             QApplication.processEvents()
             
-            combined_track = tracks.TrackPart.combine_tracks(*data)
-            self.update_visual(combined_track)
+            # This would need to return two things, instead of 1 now because we need to also return the composition of XY
+            # The XY composition would be a dictionary with keys as the track type and the values as arrays of XY and Z data for each track segment.
+            # This would allow us to plot the XY composition of the track in a 2D view, while still keeping the 3D view intact.
+            combined_track, xy_composition = tracks.TrackPart.combine_tracks(*data)
+            self.update_visual(combined_track, xy_composition)  # Update the visualization with the combined track data and XY composition
 
             # Used later to display total length, total height, etc.
             X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name = combined_track

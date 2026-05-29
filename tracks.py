@@ -346,7 +346,7 @@ class TrackPart:
 
         # Flatten the first part
         X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, _ = parts[0]["arrays"]
-        
+
         X = X.ravel().astype(float)
         Y = Y.ravel().astype(float)
         Z = Z.ravel().astype(float)
@@ -375,9 +375,10 @@ class TrackPart:
             Ny2 = Ny2.ravel().astype(float)
             Nz2 = Nz2.ravel().astype(float)
 
-            if part["is_end"]:
+            if part["section"] == "Thrills 2" or part["section"] == "Ends":
+                # If the part is a "Thrills 2" or "Ends" section, reverse the order of the arrays to ensure smooth connection
                 X2 = X2[::-1]
-                Y2 = Y2[::-1]
+                Y2 = Y2
                 Z2 = Z2[::-1]
 
                 Fx2 = -Fx2[::-1]
@@ -386,8 +387,9 @@ class TrackPart:
                 Lx2 = -Lx2[::-1]
                 Ly2 = -Ly2[::-1]
                 Lz2 = -Lz2[::-1]
-
-                # Normal vectors is reserved, so we don't need to reverse them
+                Nx2 = Nx2[::-1]
+                Ny2 = Ny2[::-1]
+                Nz2 = Nz2[::-1]
 
             # Offset the new part to connect smoothly
             X2 += X[-1] - X2[0]
@@ -408,11 +410,53 @@ class TrackPart:
             Ny = np.concatenate([Ny, Ny2])
             Nz = np.concatenate([Nz, Nz2])
 
+        # Combine all the data into a single array and write to CSV
         pts = len(X)
         data = np.column_stack((np.arange(1, pts+1), X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz))
         file_name = CSV.write_csv(data, pts, 0, "combined_track")
 
-        return X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name
+        xy_composition = []
+        current_idx = 0
 
+        for part in parts:
+            part_section = part["section"]
+            part_name = part["type"]
 
+            seg_len = part["arrays"][0].size
+            end_idx = current_idx + seg_len
+            
+            seg_X = X[current_idx:end_idx]
+            seg_Z = Y[current_idx:end_idx]
+            seg_Y = Z[current_idx:end_idx]
 
+            if part_name not in ("Loop",):
+                dx = np.diff(seg_X, prepend=seg_X[0])
+                dy = np.diff(seg_Y, prepend=seg_Y[0])
+                distances = np.sqrt(dx**2 + dy**2)
+                part_XY = np.cumsum(distances)
+            else:
+                heading_x = seg_X[-1] - seg_X[0]
+                heading_y = seg_Y[-1] - seg_Y[0]
+                heading_length = np.sqrt(heading_x**2 + heading_y**2)
+                if heading_length > 1e-5:
+                    ux = heading_x / heading_length
+                    uy = heading_y / heading_length
+                    part_XY = (seg_X - seg_X[0]) * ux + (seg_Y - seg_Y[0]) * uy
+                else:
+                    part_XY = seg_X - seg_X[0]
+
+            xy_composition.append({
+                "section": part_section,
+                "type": part_name,
+                "XY": part_XY,
+                "Z": seg_Z
+            })
+            
+            current_idx = end_idx
+
+        # Create a dictionary to store the combined track data and the XY composition of each track part
+        combined_track = (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name)
+
+        # Later on for each in
+        return combined_track, xy_composition
+    

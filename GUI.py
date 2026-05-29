@@ -162,7 +162,7 @@ class MainWindow(QMainWindow):
         self.visual_tab_widget.hide()
         self.visual_constent_layout.addWidget(self.visual_tab_widget)
 
-        # Tab 1: 3D Visualization
+        # === Tab 1: 3D Visualization ===
         self.figure_3d = Figure(layout="constrained")  # Use constrained layout for better spacing
         self.canvas_3d = FigureCanvas(self.figure_3d)
         self.ax3d = self.figure_3d.add_subplot(111, projection='3d')
@@ -173,11 +173,29 @@ class MainWindow(QMainWindow):
         tab_3d_layout.addWidget(self.canvas_3d)
         self.visual_tab_widget.addTab(tab_3d_page, "3D View")
 
-        # Tab 2: 2D Visualization (XY VS Z)
-        self.figure_2d_xyVz = Figure()
-        self.canvas_2d_xyVz = FigureCanvas(self.figure_2d_xyVz)
-        self.ax_xyVz = self.figure_2d_xyVz.add_subplot(111)
-        self.visual_tab_widget.addTab(self.canvas_2d_xyVz, "2D View (XY VS Z)")
+        # === Tab 2: 2D Visualization (Whole Track) ===
+        self.figure_2d_whole_track = Figure()
+        self.canvas_2d_whole_track = FigureCanvas(self.figure_2d_whole_track)
+        self.ax_whole_track = self.figure_2d_whole_track.add_subplot(111)
+        self.visual_tab_widget.addTab(self.canvas_2d_whole_track, "2D View (Whole Track)")
+
+        # === Tab 3: 2D Visualization (Sections 1 & 2) ===
+        self.figure_2d_section_12 = Figure()
+        self.canvas_2d_section_12 = FigureCanvas(self.figure_2d_section_12)
+        self.ax_section_12 = self.figure_2d_section_12.add_subplot(111)
+        self.visual_tab_widget.addTab(self.canvas_2d_section_12, "2D View (Sections 1 & 2)")
+
+        # Tab 4: 2D Visualization (Section 3) ===
+        self.figure_2d_section_3 = Figure()
+        self.canvas_2d_section_3 = FigureCanvas(self.figure_2d_section_3)
+        self.ax_section_3 = self.figure_2d_section_3.add_subplot(111)
+        self.visual_tab_widget.addTab(self.canvas_2d_section_3, "2D View (Section 3)")
+
+        # Tab 5: 2D Visualization (Sections 4 & 5) ===
+        self.figure_2d_section_45 = Figure()
+        self.canvas_2d_section_45 = FigureCanvas(self.figure_2d_section_45)
+        self.ax_section_45 = self.figure_2d_section_45.add_subplot(111)
+        self.visual_tab_widget.addTab(self.canvas_2d_section_45, "2D View (Sections 4 & 5)")
 
         # Add to the main layout, with a scale factor of 3 to make it larger
         self.track_layout.addWidget(self.visual_widget, 3)
@@ -377,24 +395,45 @@ class MainWindow(QMainWindow):
         self.ax3d.legend(loc='upper right', bbox_to_anchor=(1.0, 1.0), fontsize=font_size)
         self.canvas_3d.draw()
 
-        # === 2D View (XY vs Z View) ===
-        # This is where the XY composition of the track is plotted in a 2D view, while still keeping the 3D view intact.
-        self.ax_xyVz.clear()
+        # === 2D View (Everything) ===
+        # This is where the XY composition of the whole track is plotted in a 2D view.
+        self.ax_whole_track.clear()
+        self.ax_section_12.clear()
+        self.ax_section_3.clear()
+        self.ax_section_45.clear()
         current_horizontal_offset = 0
-        for segment in xy_composition:
+        for idx, segment in enumerate(xy_composition):
             local_horizontal = segment["XY"]
             Z_elevation = segment["Z"]
 
             global_2d_horizontal = local_horizontal + current_horizontal_offset
+            self.ax_whole_track.plot(global_2d_horizontal, Z_elevation)
 
-            self.ax_xyVz.plot(global_2d_horizontal, Z_elevation)
+            if idx in (0, 1):
+                self.ax_section_12.plot(global_2d_horizontal, Z_elevation)
+            elif idx == 2:
+                self.ax_section_3.plot(global_2d_horizontal, Z_elevation)
+            elif idx in (3, 4):
+                self.ax_section_45.plot(global_2d_horizontal, Z_elevation)
+
             current_horizontal_offset = global_2d_horizontal[-1]  # Update the offset for the next segment
 
-        self.ax_xyVz.set_aspect('equal')
-        self.ax_xyVz.set_xlabel("XY Composition", fontsize=font_size)
-        self.ax_xyVz.set_ylabel("Z Elevation", fontsize=font_size)
-        self.canvas_2d_xyVz.draw()
-        
+        # 2D View Settings
+        ax_list = [
+            (self.ax_whole_track, self.canvas_2d_whole_track, "Whole Track"),
+            (self.ax_section_12, self.canvas_2d_section_12, "Section 1-2"),
+            (self.ax_section_3, self.canvas_2d_section_3, "Section 3"),
+            (self.ax_section_45, self.canvas_2d_section_45, "Section 4-5")
+        ]
+
+        for ax, canvas, title in ax_list:
+            ax.set_aspect('equal')
+            ax.set_xlabel("XY Composition", fontsize=font_size)
+            ax.set_ylabel("Z Elevation", fontsize=font_size)
+            ax.set_title(title, fontsize=font_size)
+            canvas.draw()
+
+
 
     # ========================================================================
     #                       Create Helper Functions

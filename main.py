@@ -18,21 +18,21 @@ def main():
     """
     # Test code
     # Runs chosen track
-    results = tracks.TrackPart.loopCG_func(19)  # Changable parameters for different tracks
-    X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name = results
-    print("CSV file generated:", file_name)
+    # combined_track = tracks.TrackPart.loopCG_func(11)  # Changable parameters for different tracks
+    # X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name = combined_track
+    # print("CSV file generated:", file_name)
     
 
     # # Plots chosen track in a 3D plot
-    build.plot(results)
+    # build.plot(combined_track)
 
     # Test combining multiple track parts
-    # part1 = tracks.TrackPart.camelback_func(10)
-    # part2 = tracks.TrackPart.break_func(15)
-    # part3 = tracks.TrackPart.cobrarollCG_func(12)
+    part1 = tracks.TrackPart.lifthill_func(11.0)
+    part2 = tracks.TrackPart.loopCG_func(11.0)
+    part3 = tracks.TrackPart.cobrarollCG_func(11.0)
 
-    # combined = tracks.TrackPart.combine_tracks(part1, part2, part3)
-    # build.plot(combined)
+    combined, xy_composition = tracks.TrackPart.combine_tracks(part1, part2, part3)
+    build.plot(combined)
 
 
     

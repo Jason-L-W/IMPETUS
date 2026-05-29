@@ -413,7 +413,7 @@ class TrackPart:
         # Combine all the data into a single array and write to CSV
         pts = len(X)
         data = np.column_stack((np.arange(1, pts+1), X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz))
-        file_name = CSV.write_csv(data, pts, 0, "combined_track")
+        file_name = CSV.csv_noLimits_format(data, pts, 0, "combined_track")
 
         xy_composition = []
         current_idx = 0
@@ -451,7 +451,7 @@ class TrackPart:
                 "XY": part_XY,
                 "Z": seg_Z
             })
-            
+
             current_idx = end_idx
 
         # Create a dictionary to store the combined track data and the XY composition of each track part

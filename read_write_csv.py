@@ -43,7 +43,7 @@ def write_csv(data, pts, prop, elementname):
     # Open the file and write the following into it
     with open(file_name, mode="w", newline="") as f:
         writer = csv.writer(f)
-        header = ["Index","X","Y","Z","Fx","Fy","Fz","Lx","Ly","Lz","Nx","Ny","Nz"]
+        header = ['"No."','"PosX"','"PosY"','"PosZ"','"FrontX"','"FrontY"','"FrontZ"','"LeftX"','"LeftY"','"LeftZ"','"UpX"','"UpY"','"UpZ"']
         writer.writerow(header)
         writer.writerows(data)
 
@@ -54,7 +54,7 @@ def write_csv(data, pts, prop, elementname):
 # Converts txt file to csv file
 def txt_to_csv(file_name):
     # Header
-    h = ["Index","X","Y","Z","Fx","Fy","Fz","Lx","Ly","Lz","Nx","Ny","Nz"]
+    h = ['"No."','"PosX"','"PosY"','"PosZ"','"FrontX"','"FrontY"','"FrontZ"','"LeftX"','"LeftY"','"LeftZ"','"UpX"','"UpY"','"UpZ"']
 
     # Replace .txt with .csv
     output_csv = file_name.rsplit('.',1)[0] + ".csv"
@@ -70,5 +70,34 @@ def txt_to_csv(file_name):
 
 #########################################################################################
 
-
+# This actually works. DON'T TOUCH IT. If touch it may be broken.
+def csv_noLimits_format(data, pts, prop, elementname):
+    # NoLimits 2 spline header format
+    file_name = f"{elementname}_{prop}.csv"
     
+    # Define the precise NoLimits 2 spline header with literal tab spacing
+    header_line = '"No."\t"PosX"\t"PosY"\t"PosZ"\t"FrontX"\t"FrontY"\t"FrontZ"\t"LeftX"\t"LeftY"\t"LeftZ"\t"UpX"\t"UpY"\t"UpZ"\n'
+    
+    # Open the file and write out directly
+    with open(file_name, mode="w", newline="", encoding="utf-8") as f:
+        # 1. Write the header line cleanly with zero backslashes
+        f.write(header_line)
+        
+        # 2. Iterate through the array slices and format each item into scientific notation
+        for row in data[:pts]:
+            # Element 0 is the index integer, the rest (1 to 12) are float coordinates/vectors
+            idx = int(row[0])
+            coords = row[1:13]
+            
+            # Convert float items to scientific notation strings (e.g., 1.234560e+01)
+            # %e provides standard scientific notation format matching MATLAB's %e behavior
+            formatted_coords = [f"{float(val):e}" for val in coords]
+            
+            # Combine the integer index with the formatted float coordinates
+            line_items = [str(idx)] + formatted_coords
+            
+            # Join together with tabs and write the line
+            f.write("\t".join(line_items) + "\n")
+
+    print(f"file {file_name} created successfully")
+    return file_name

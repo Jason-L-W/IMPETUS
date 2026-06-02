@@ -3,11 +3,11 @@ import pandas as pd
 import numpy as np
 import csv
 
-# All functions has to do with reading and writing .csv files
+# All functions HERE has to do with reading and writing .csv files
 
-#########################################################################################
-
-# Read from .csv file
+# ========================================================================
+#                       Read from .csv file
+# ========================================================================
 def read_csv(file_name):
     all_data = []
     try:
@@ -33,9 +33,10 @@ def read_csv(file_name):
 
     return np.array(all_data)
 
-#########################################################################################
 
-# Write to .csv file
+# ========================================================================
+#                       Write to .csv file
+# ========================================================================
 # Gets the data, points, track properties (length, height, radius), and track name and convert it into a csv
 def write_csv(data, pts, prop, elementname):
     # Make the filename for CSV (function_Length_Index)
@@ -49,9 +50,10 @@ def write_csv(data, pts, prop, elementname):
 
     return file_name
 
-#########################################################################################
 
-# Converts txt file to csv file
+# ========================================================================
+#                       Convert txt to csv
+# ========================================================================
 def txt_to_csv(file_name):
     # Header
     h = ['"No."','"PosX"','"PosY"','"PosZ"','"FrontX"','"FrontY"','"FrontZ"','"LeftX"','"LeftY"','"LeftZ"','"UpX"','"UpY"','"UpZ"']
@@ -68,8 +70,10 @@ def txt_to_csv(file_name):
         print(f"Error converting file: {e}")
         return None
 
-#########################################################################################
 
+# ========================================================================
+#                     NoLimits 2 Spline Format
+# ========================================================================
 # This actually works. DON'T TOUCH IT. If touch it may be broken.
 def csv_noLimits_format(data, pts, prop, elementname):
     # NoLimits 2 spline header format

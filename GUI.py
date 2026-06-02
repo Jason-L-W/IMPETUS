@@ -13,22 +13,24 @@ import numpy as np
 
 import tracks
 
+# When adding new track types, they should be added to the ALL_TRACKS list and the track_function_map dictionary below.
 
 # ========================================================================
 SECTIONS = ["Starts", "Thrills 1", "Turns", "Thrills 2", "Ends"]    # Defines the sections of the track assembly
-STARTS = ["Launch", "Lift Hill", "Rollback[x]"]                     # Defines the starting track types
+STARTS = ["Launcher", "Lift Hill", "Rollback"]                     # Defines the starting track types
 THRILLS = ["Loop", "Camelback", "Corkscrew"]                        # Defines the thrill track types
 TURNS = ["Cobral Roll", "Horseshoe[x]", "Helix[x]"]                 # Defines the turn track types
 ENDS = ["Brake", "Rollup[x]"]                                       # Defines the ending track types
 ALL_TRACKS = STARTS + THRILLS + TURNS + ENDS                        # Defines all track types for validation
 # ========================================================================
 
-# Maps track types to their corresponding functions in the tracks module
+# Maps track types to their corresponding functions in the tracks module.
+# When there are new track types, they should be added to this dictionary with their corresponding function from the tracks module.
 track_function_map = {
     # Starts
-    "Launch": tracks.TrackPart.brake_func,
-    "Lift Hill": tracks.TrackPart.lifthill_func,
-    "Rollback[x]": tracks.TrackPart.rollback_func,
+    "Launcher": tracks.TrackPart.launcher_func,             # Using this will result a return to the beginning of the track
+    "Lift Hill": tracks.TrackPart.lifthill_func,            # Using this will result a return to the beginning of the track
+    "Rollback": tracks.TrackPart.rollback_func,             # Has no return, but can be used to begin the track with a rollback
 
     # Thrills
     "Loop": tracks.TrackPart.loopCG_func,
@@ -41,8 +43,8 @@ track_function_map = {
     "Helix[x]": tracks.TrackPart.helix_func,
 
     # Ends
-    "Brake": tracks.TrackPart.brake_func, # Using this 
-    "Rollup[x]": tracks.TrackPart.rollup_func # Has no return
+    "Brake": tracks.TrackPart.brake_func,                   # Using this will result a return to the beginning of the track
+    "Rollup[x]": tracks.TrackPart.rollup_func               # Has no return, but can be used to end the track with a rollup
 
 }
 
@@ -395,7 +397,7 @@ class MainWindow(QMainWindow):
         self.ax3d.legend(loc='upper right', bbox_to_anchor=(1.0, 1.0), fontsize=font_size)
         self.canvas_3d.draw()
 
-        # === 2D View (Everything) ===
+        # === 2D View ===
         # This is where the XY composition of the whole track is plotted in a 2D view.
         self.ax_whole_track.clear()
         self.ax_section_12.clear()
@@ -427,12 +429,16 @@ class MainWindow(QMainWindow):
         ]
 
         for ax, canvas, title in ax_list:
-            ax.set_aspect('equal')
+            ax.axis('scaled')
             ax.set_xlabel("XY Composition", fontsize=font_size)
             ax.set_ylabel("Z Elevation", fontsize=font_size)
             ax.set_title(title, fontsize=font_size)
             canvas.draw()
 
+            filename = f"{title.lower().replace(' ', '_')}.png"
+            ax.axis('off')  # Turn off the axis for saving the image
+            ax.figure.savefig(filename, dpi=300, bbox_inches='tight', pad_inches=0.1)
+            ax.axis('on')  # Turn the axis back on after saving the image
 
 
     # ========================================================================
@@ -465,14 +471,22 @@ class MainWindow(QMainWindow):
                 if track_type in ALL_TRACKS:
                     build_func = track_function_map.get(track_type)
                     if build_func:
-                        segment = build_func(length_value)
+                        # If track type is a starting track, it will return both the track segment and the exit velocity,
+                        # otherwise it will just return the track segment.
+                        if track_type in STARTS:
+                            segment, v_exit = build_func(length_value)
+                            # Checks the exit velocity of the starting track.
+                            # print(f"Generated {track_type} with exit velocity: {v_exit[0]:.2f} m/s")
+                        else:
+                            segment = build_func(length_value)
 
                         # Appends to data an array list of track type and its data list
                         # The data keeps tracks of section, type, and arrays for each track segment
                         data.append({
                             "section": section,
                             "type": track_type,
-                            "arrays": segment
+                            "arrays": segment,
+                            "v_exit": v_exit if track_type in STARTS else None
                         })
                     else:
                         QMessageBox.warning(self, "Unknown Track", f"Track type {track_type} is not recognized.")
@@ -505,7 +519,6 @@ class MainWindow(QMainWindow):
 
         except Exception as e:
             QMessageBox.critical(self, "Assembly Error", f"An error occurred during assembly: {str(e)}")
-
 
 
 

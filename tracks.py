@@ -15,7 +15,8 @@ class TrackPart:
             setattr(self, key, kwargs.get(key, None))
 
     # ========================== Any track given data ==========================
-    # Given data from a csv file, scale it and return the track part
+    # Given data (csv file) of a real track, this function will read the data and return the track
+    # part which is scaled, based on the user input.
     def from_data(data, scale, name):
         track_data = data.copy()
 
@@ -31,17 +32,29 @@ class TrackPart:
         file_name = CSV.write_csv(track_data, pts, scale, name)
         return X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name
 
-    # ========================== Break track part (done) ==========================
-    def brake_func(L):
+
+    # ========================================================================
+    #                               Start Tracks
+    # ========================================================================
+    # Launcher track part (done)
+    @staticmethod
+    def launcher_func(L):
         X = np.arange(0, L+1, 1)
         pts = len(X)
-
         Y, Z = np.zeros(pts), np.zeros(pts)
-        Fx, Fy, Fz = X.copy(), Y, Z
-        Lx, Ly, Lz = np.zeros(pts), np.zeros(pts), -np.ones(pts)
         Nx, Ny, Nz = np.zeros(pts), np.ones(pts), np.zeros(pts)
+        Fx, Fy, Fz = np.ones(pts), np.ones(pts), np.ones(pts)
 
-        # Within a row of data, each column represents: 13 data points
+        Fx[:-1] = X[1:] - X[:-1]
+        Fy[:-1] = Y[1:] - Y[:-1]
+        Fz[:-1] = Z[1:] - Z[:-1]
+
+        Fx[-1], Fy[-1], Fz[-1] = Fx[-2], Fy[-2], Fz[-2]
+
+        Lx = Y * Fz - Z * Fy
+        Ly = Z * Fx - X * Fz
+        Lz = X * Fy - Y * Fx
+
         data = np.column_stack((
             np.arange(1, pts+1), # Starting index from 1 to pts
             X, Y, Z,
@@ -50,10 +63,121 @@ class TrackPart:
             Nx, Ny, Nz
             ))
         
-        file_name = CSV.write_csv(data, pts, L, "break")
-        return X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name
+        file_name = CSV.write_csv(data, pts, L, "launcher")
+        track_content = X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name
+        
+        # v_exit = sqrt(2aL) where a is the acceleration and L is the length of the track
+        v_exit = np.sqrt(2 * 2.5 * 9.8 * L) # Assuming a constant acceleration of 2.5g for the launcher
+        return track_content, v_exit
     
-    # ========================== Camelback track part (done) ==========================
+    # Lifthill track part (done)
+    @staticmethod
+    def lifthill_func(h):
+        # h is the max height
+        data = CSV.read_csv("cometlifthill.csv")
+        lifthill = data.copy()
+
+        # Scales the track based on your input height
+        lifthill[:, 1:4] = lifthill[:, 1:4] * h / np.max(data[:, 2])
+
+        X, Y, Z = lifthill[:, 1], lifthill[:, 2], lifthill[:, 3]
+        Fx, Fy, Fz = lifthill[:, 4], lifthill[:, 5], lifthill[:, 6]
+        Lx, Ly, Lz = lifthill[:, 7], lifthill[:, 8], lifthill[:, 9]
+        Nx, Ny, Nz = lifthill[:, 10], lifthill[:, 11], lifthill[:, 12]
+
+        pts = len(lifthill)
+        file_name = CSV.write_csv(lifthill, pts, h, "lifthill")
+        track_content = (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name)
+        max_y = np.max(Y)
+        v_exit = np.sqrt(2 * 9.8 * max_y)
+        return track_content, v_exit
+
+    # Rollback track part (done)
+    @staticmethod
+    def rollback_func(h):
+        R = (2 / 3) * h
+        
+        tan_60 = np.tan(np.radians(60))
+        sin_60 = np.sin(np.radians(60))
+
+        max_x1 = (2 * h) / (3 * tan_60)
+        Xc = max_x1 + R * sin_60
+        
+        # Track section lengths
+        station_length = 15
+        final_flat_length = 15
+        
+        total_x_length = int(np.floor(Xc)) + station_length + final_flat_length
+
+        X = np.arange(0, total_x_length + 1, 1, dtype=float)
+        Y = np.zeros_like(X)
+        pts = len(X)
+
+        # 3. Map Y values sequentially using smooth conditional boundaries
+        for i in range(pts):
+            xi = X[i]
+            if xi <= max_x1:
+                # Section 1: Slope
+                Y[i] = h - tan_60 * xi
+            elif xi <= Xc:
+                # Section 2: Curve
+                Y[i] = R - np.sqrt(R**2 - (xi - Xc)**2)
+            elif xi <= Xc + station_length:
+                # Section 3: Station Flat (Locked to the curve's exit height)
+                Y_exit_curve = R - np.sqrt(R**2 - (Xc - Xc)**2)
+                Y[i] = Y_exit_curve
+            else:
+                # Section 4: Final Flat
+                Y[i] = 0.0
+
+        Z = np.zeros_like(X)
+
+        Nx = np.zeros(pts)
+        Ny = np.zeros(pts)
+        Nz = np.zeros(pts)
+
+        dx = X[1:] - X[:-1]
+        dy = Y[1:] - Y[:-1]
+        hyp = np.sqrt(dx**2 + dy**2)
+        hyp = np.where(hyp == 0, 1, hyp)  # Prevent division by zero
+
+        tx = dx / hyp
+        ty = dy / hyp
+
+        Nx[:-1] = -ty
+        Ny[:-1] = tx
+
+        Nx[-1] = Nx[-2]
+        Ny[-1] = Ny[-2]
+
+        Fx, Fy, Fz = np.ones(pts), np.ones(pts), np.ones(pts)
+        Fx[:-1] = X[1:] - X[:-1]
+        Fy[:-1] = Y[1:] - Y[:-1]
+        Fz[:-1] = Z[1:] - Z[:-1]
+        Fx[-1], Fy[-1], Fz[-1] = Fx[-2], Fy[-2], Fz[-2]
+
+        Lx = Y * Fz - Z * Fy
+        Ly = Z * Fx - X * Fz
+        Lz = X * Fy - Y * Fx
+
+        data = np.column_stack((
+            np.arange(1, pts+1), # Starting index from 1 to pts
+            X, Y, Z,
+            Fx, Fy, Fz,
+            Lx, Ly, Lz,
+            Nx, Ny, Nz
+            ))
+        
+        file_name = CSV.write_csv(data, pts, h, "rollback")
+        track_content = X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name
+        v_exit = np.sqrt(2 * 9.8 * h)
+        return track_content, v_exit
+
+    # ========================================================================
+    #                               Thrill Tracks
+    # ========================================================================
+    # Camelback track part (done)
+    @staticmethod
     def camelback_func(h):
         data = CSV.read_csv("cometcamelback.csv")
         camelback = data.copy()
@@ -69,25 +193,12 @@ class TrackPart:
 
         pts = len(camelback)
         file_name = CSV.write_csv(camelback, pts, h, "camelback")
-        return X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name
-    
-    # ========================== Cobra Roll track part (done) ==========================
-    def cobrarollCG_func(h):
-        data = CSV.read_csv("flashbackcobraroll.csv")
-        cobraroll = data.copy()
-        # Scales the track based on your input height
-        cobraroll[:, 1:4] = cobraroll[:, 1:4] * h / np.max(data[:, 2])
-        
-        X, Y, Z = cobraroll[:, 1] * 3, cobraroll[:, 2], cobraroll[:, 3]
-        Fx, Fy, Fz = cobraroll[:, 4], cobraroll[:, 5], cobraroll[:, 6]
-        Lx, Ly, Lz = cobraroll[:, 7], cobraroll[:, 8], cobraroll[:, 9]
-        Nx, Ny, Nz = cobraroll[:, 10], cobraroll[:, 11], cobraroll[:, 12]
+        track_content = (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name)
 
-        pts = len(cobraroll)
-        file_name = CSV.write_csv(cobraroll, pts, h, "cobarollCG")
-        return X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name
+        return track_content
 
-    # ========================== Corkscrew track part (done) ==========================
+    # Corkscrew track part (done)
+    @staticmethod
     def corkscrew_func(h):
         H = h * 4 # Total height of corkscrew
         r1 = H/2 # Radius of corkscrew
@@ -190,72 +301,15 @@ class TrackPart:
         pts = len(X)
         data = np.column_stack((np.arange(1, pts+1), X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz))
         file_name = CSV.write_csv(data, pts, r1, "corkscrew")
+        track_content = (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name)
 
-        return X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name
+        return track_content
 
-    # ========================== Helix track part (TODO) ==========================
-    def helix_func(h):
-        R = 2 * h
-
-        # All X components to the track
-        X1 = np.arange(0, 3*R+1, 1) # Array of 1 from index 0 to 3*R
-        X2 = np.arange(3*R + 1, 4*R + 1, 1)
-        X3 = np.arange(4*R - 1, 2*R - 1, -1)
-        X4 = np.arange(2*R + 1, 4*R + 1, 1)
-        X5 = np.arange(4*R - 1, 3*R - 1, -1)
-        X6 = np.arange(3*R - 1, -1, -1)
-
-        # All Y components to the track
-        Y1 = (h/2) * (1 - np.cos((np.pi*X1) / (3*R)))
-        Y2345 = max(Y1) - (h/2) * (1 - np.cos(np.pi * (np.arange(1, 6*R+1, 1)) / (6*R)))
-        Y6 = np.arange(1, len(X6), 0)
-
-        # All Z components to the track
-        Z1 = np.ones(len(X1))
-        Z2 = -R + np.sqrt(R**2 - (X2 - 3*R)**2)
-        Z3 = -R - np.sqrt(R**2 - (X3 - 3*R)**2)
-        Z4 = -R + np.sqrt(R**2 - (X4 - 3*R)**2)
-        Z5 = -R - np.sqrt(R**2 - (X5 - 3*R)**2)
-        Z6 = np.arange(1, len(X6), -2*R)
-
-        # All Phi components to the track (angle)
-        Phi1 = (45/2) * (1 - np.cos((np.pi*X1) / (3*R)))
-        Phi2345 = 54.2 + 9.2*(-np.cos(np.pi * np.arange(1, 6*R-1, 1) / (6*R)))
-        Phi6 = 63.4 + (63.4/2) * (-1 + np.cos(np.pi*X1/(3*R)))
-
-        # Combining compnents
-        X = np.concatenate([X1, X2, X3, X4, X5, X6])
-        Y = np.concatenate([Y1, Y2345, Y6])
-        Z = np.concatenate([Z1, Z2, Z3, Z4, Z5, Z6])
-        Phi = np.concatenate([Phi1, Phi2345, Phi6])
-
-
-        return None
-
-    # ========================== Horseshoe roll track part (TODO) ==========================
-    def horseshoe_func(h):
-        return None
-
-    # ========================== Lifthill track part (done) ==========================
-    def lifthill_func(h):
-        # h is the max height
-        data = CSV.read_csv("cometlifthill.csv")
-        lifthill = data.copy()
-
-        # Scales the track based on your input height
-        lifthill[:, 1:4] = lifthill[:, 1:4] * h / np.max(data[:, 2])
-
-        X, Y, Z = lifthill[:, 1], lifthill[:, 2], lifthill[:, 3]
-        Fx, Fy, Fz = lifthill[:, 4], lifthill[:, 5], lifthill[:, 6]
-        Lx, Ly, Lz = lifthill[:, 7], lifthill[:, 8], lifthill[:, 9]
-        Nx, Ny, Nz = lifthill[:, 10], lifthill[:, 11], lifthill[:, 12]
-
-        pts = len(lifthill)
-        file_name = CSV.write_csv(lifthill, pts, h, "lifthill")
-        return X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name
-
-    # ========================== Loop with constant G-force (possibly need to fix) ==========================
-    # Need to make it so that when the loop ends, it ends at the same height it started --> Y=0
+        # ========================== Loop with constant G-force (possibly need to fix) ==========================
+    
+    # Loop with constant G-force (done)
+    # This also needs to return the height, r1, and r2 of the loop
+    @staticmethod
     def loopCG_func(r, ngs = 4):
         g = 9.8
         H = ((ngs - 1) * r) / 2
@@ -320,32 +374,140 @@ class TrackPart:
 
         data = np.column_stack((np.arange(1, len(X) + 1), X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz))
         file_name = CSV.write_csv(data, pts, r, "loopCG")
-        
-        return X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name
-    
-    # ========================== Loop with 2 different radii (TODO) ==========================
-    # 2 Loops
+        track_content = (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name)
+
+        return track_content
+
+    # Loop with 2 different radii (TODO - later)
+    @staticmethod
     def loopwith2Rs(r1, r2):
         return None
 
-    # ========================== Rollback track part (TODO) ==========================
-    def rollback_func(h):
-        R = (2/3) * h
+
+    # ========================================================================
+    #                               Turn Tracks
+    # ========================================================================
+    # Cobra Roll track part (done)
+    @staticmethod
+    def cobrarollCG_func(h):
+        data = CSV.read_csv("flashbackcobraroll.csv")
+        cobraroll = data.copy()
+        # Scales the track based on your input height
+        cobraroll[:, 1:4] = cobraroll[:, 1:4] * h / np.max(data[:, 2])
+        
+        X, Y, Z = cobraroll[:, 1] * 3, cobraroll[:, 2], cobraroll[:, 3]
+        Fx, Fy, Fz = cobraroll[:, 4], cobraroll[:, 5], cobraroll[:, 6]
+        Lx, Ly, Lz = cobraroll[:, 7], cobraroll[:, 8], cobraroll[:, 9]
+        Nx, Ny, Nz = cobraroll[:, 10], cobraroll[:, 11], cobraroll[:, 12]
+
+        pts = len(cobraroll)
+        file_name = CSV.write_csv(cobraroll, pts, h, "cobarollCG")
+        track_content = (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name)
+
+        return track_content
+
+    # Helix track part (TODO)
+    @staticmethod
+    def helix_func(h):
+        R = 2 * h
+
+        # All X components to the track
+        X1 = np.arange(0, 3*R+1, 1) # Array of 1 from index 0 to 3*R
+        X2 = np.arange(3*R + 1, 4*R + 1, 1)
+        X3 = np.arange(4*R - 1, 2*R - 1, -1)
+        X4 = np.arange(2*R + 1, 4*R + 1, 1)
+        X5 = np.arange(4*R - 1, 3*R - 1, -1)
+        X6 = np.arange(3*R - 1, -1, -1)
+
+        # All Y components to the track
+        Y1 = (h/2) * (1 - np.cos((np.pi*X1) / (3*R)))
+        Y2345 = max(Y1) - (h/2) * (1 - np.cos(np.pi * (np.arange(1, 6*R+1, 1)) / (6*R)))
+        Y6 = np.arange(1, len(X6), 0)
+
+        # All Z components to the track
+        Z1 = np.ones(len(X1))
+        Z2 = -R + np.sqrt(R**2 - (X2 - 3*R)**2)
+        Z3 = -R - np.sqrt(R**2 - (X3 - 3*R)**2)
+        Z4 = -R + np.sqrt(R**2 - (X4 - 3*R)**2)
+        Z5 = -R - np.sqrt(R**2 - (X5 - 3*R)**2)
+        Z6 = np.arange(1, len(X6), -2*R)
+
+        # All Phi components to the track (angle)
+        Phi1 = (45/2) * (1 - np.cos((np.pi*X1) / (3*R)))
+        Phi2345 = 54.2 + 9.2*(-np.cos(np.pi * np.arange(1, 6*R-1, 1) / (6*R)))
+        Phi6 = 63.4 + (63.4/2) * (-1 + np.cos(np.pi*X1/(3*R)))
+
+        # Combining compnents
+        X = np.concatenate([X1, X2, X3, X4, X5, X6])
+        Y = np.concatenate([Y1, Y2345, Y6])
+        Z = np.concatenate([Z1, Z2, Z3, Z4, Z5, Z6])
+        Phi = np.concatenate([Phi1, Phi2345, Phi6])
 
         return None
+    
+    # Horseshoe roll track part (TODO)
+    @staticmethod
+    def horseshoe_func(h):
+        return None
 
-    # ========================== Rollup track part (TODO) ==========================
+
+    # =======================================================================
+    #                               End Tracks
+    # =======================================================================
+    # Break track part (done)
+    # this for a strong break A = 1.5g
+    @staticmethod
+    def brake_func(L):
+        X = np.arange(0, L+1, 1)
+        pts = len(X)
+
+        Y, Z = np.zeros(pts), np.zeros(pts)
+        Fx, Fy, Fz = X.copy(), Y, Z
+        Lx, Ly, Lz = np.zeros(pts), np.zeros(pts), -np.ones(pts)
+        Nx, Ny, Nz = np.zeros(pts), np.ones(pts), np.zeros(pts)
+
+        # Within a row of data, each column represents: 13 data points
+        data = np.column_stack((
+            np.arange(1, pts+1), # Starting index from 1 to pts
+            X, Y, Z,
+            Fx, Fy, Fz,
+            Lx, Ly, Lz,
+            Nx, Ny, Nz
+            ))
+        
+        file_name = CSV.write_csv(data, pts, L, "break")
+        track_content = (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name)
+        return track_content
+
+    # Rollup track part (TODO)
+    @staticmethod
     def rollup_func(h):
         return None
 
-    # ========================== Combine multiple track parts into one (Done) ==========================
-    # Combines multiple track parts into one
+
+    # =======================================================================
+    #               Combine Multiple Track Parts into One
+    # =======================================================================
+    # Combine multiple track parts into one (Done)
+    @staticmethod
     def combine_tracks(*parts):
+        # Parts include the following:
+        # "section": the section of the track part (start, thrill, turn, end)
+        # "type": the type of the track part
+        # "arrays": the arrays of the track part (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name)
+        # "v_exit": the exit velocity of the track part (if applicable)
+
         if not parts:
             return None
 
+        # === Combine the tracks together and finding the velocity ===
         # Flatten the first part
         X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, _ = parts[0]["arrays"]
+        
+        # Get the velocity exiting from the starting track
+        velocities = {}
+        v_exit = parts[0]["v_exit"]
+        # print(f"Starting track exit velocity is: {v_exit:.2f} m/s")
 
         X = X.ravel().astype(float)
         Y = Y.ravel().astype(float)
@@ -359,6 +521,7 @@ class TrackPart:
         Nx = Nx.ravel().astype(float)
         Ny = Ny.ravel().astype(float)
         Nz = Nz.ravel().astype(float)
+
 
         for part in parts[1:]:
             X2, Y2, Z2, Fx2, Fy2, Fz2, Lx2, Ly2, Lz2, Nx2, Ny2, Nz2, _ = part["arrays"]
@@ -374,6 +537,11 @@ class TrackPart:
             Nx2 = Nx2.ravel().astype(float)
             Ny2 = Ny2.ravel().astype(float)
             Nz2 = Nz2.ravel().astype(float)
+
+            filename = part.get("filename", f"track_part_{id(part)}")
+            part_velocities = TrackPhysics.velocity_check(v_exit, Y2, track_type=part["type"])
+            velocities[part["type"]] = part_velocities
+            v_exit = part_velocities[-1]
 
             if part["section"] == "Thrills 2" or part["section"] == "Ends":
                 # If the part is a "Thrills 2" or "Ends" section, reverse the order of the arrays to ensure smooth connection
@@ -415,9 +583,9 @@ class TrackPart:
         data = np.column_stack((np.arange(1, pts+1), X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz))
         file_name = CSV.csv_noLimits_format(data, pts, 0, "combined_track")
 
+        # === Calculates the xy VS z composition of the track ===
         xy_composition = []
         current_idx = 0
-
         for part in parts:
             part_section = part["section"]
             part_name = part["type"]
@@ -457,6 +625,64 @@ class TrackPart:
         # Create a dictionary to store the combined track data and the XY composition of each track part
         combined_track = (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name)
 
-        # Later on for each in
         return combined_track, xy_composition
     
+
+
+# ========================== Physics Calculations for Track Design (TODO) ==========================
+class TrackPhysics:
+    @staticmethod
+    def velocity_check(v_exit, Y_array, track_type="Track segment"):
+        # Check if the exit velocity from the previous track part is sufficient to navigate the next track part
+        # This can be done by calculating the required velocity to navigate the next track part and comparing it to the exit velocity
+        g = 9.8
+        
+        delta_y = Y_array - Y_array[0]
+        v_squared = (v_exit ** 2) - (2 * g * delta_y)
+
+        with np.errstate(invalid='ignore'):
+            velocity_array = np.sqrt(v_squared)
+        
+        if np.isnan(velocity_array).any():
+            first_fail_idx = np.where(np.isnan(velocity_array))[0][0]
+            fail_height = delta_y[first_fail_idx]
+
+            raise ValueError(
+                f"Insufficient energy"
+            )
+
+        return velocity_array
+
+    @staticmethod
+    def calculate_R(track_content):
+        # Change in theta = arccos((F1xF2x + F1yF2y + F1zF2z) / (|F1| * |F2|))
+        # where F1 and F2 are the force vectors at the start and end of the track part
+
+
+        # Change in S = 
+
+        return None
+
+    @staticmethod
+    def valley_check(r, v_exit):
+        # Check if the valley between two track parts is too deep for the given exit velocity
+        # This can be done by calculating the potential energy at the lowest point of the valley and comparing it to the kinetic energy of the coaster at that point
+        return None
+
+    @staticmethod
+    def inversion_check(r, v_exit):
+        # Check if the radius of a loop or inversion is too small for the given exit velocity
+        # This can be done by calculating the centripetal force required to navigate the loop and comparing it to the maximum g-force that riders can safely experience
+        return None
+
+    @staticmethod
+    def peak_check(r, v_exit):
+        # Check if the peak of a hill is too high for the given exit velocity
+        # This can be done by calculating the potential energy at the peak and comparing it to the kinetic energy of the coaster at that point
+        return None
+
+    @staticmethod
+    def gforce_check(r, v_exit):
+            # Check if the g-force experienced by riders at any point on the track exceeds safe limits
+            # This can be done by calculating the g-force at each point on the track and comparing it to a threshold value (e.g., 5g)
+            return None

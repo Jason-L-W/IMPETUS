@@ -19,7 +19,7 @@ import tracks
 SECTIONS = ["Starts", "Thrills 1", "Turns", "Thrills 2", "Ends"]    # Defines the sections of the track assembly
 STARTS = ["Launcher", "Lift Hill", "Rollback"]                     # Defines the starting track types
 THRILLS = ["Loop", "Camelback", "Corkscrew"]                        # Defines the thrill track types
-TURNS = ["Cobral Roll", "Horseshoe[x]", "Helix[x]"]                 # Defines the turn track types
+TURNS = ["Cobral Roll", "Horseshoe", "Helix[x]"]                 # Defines the turn track types
 ENDS = ["Brake", "Rollup[x]"]                                       # Defines the ending track types
 ALL_TRACKS = STARTS + THRILLS + TURNS + ENDS                        # Defines all track types for validation
 # ========================================================================
@@ -39,7 +39,7 @@ track_function_map = {
 
     # Turns
     "Cobral Roll": tracks.TrackPart.cobrarollCG_func,
-    "Horseshoe[x]": tracks.TrackPart.horseshoe_func,
+    "Horseshoe": tracks.TrackPart.horseshoe_func,
     "Helix[x]": tracks.TrackPart.helix_func,
 
     # Ends
@@ -164,40 +164,49 @@ class MainWindow(QMainWindow):
         self.visual_tab_widget.hide()
         self.visual_constent_layout.addWidget(self.visual_tab_widget)
 
+        # Keep track of the plots
+        self.track_plots = {}
+
         # === Tab 1: 3D Visualization ===
-        self.figure_3d = Figure(layout="constrained")  # Use constrained layout for better spacing
-        self.canvas_3d = FigureCanvas(self.figure_3d)
-        self.ax3d = self.figure_3d.add_subplot(111, projection='3d')
+        fig_3d = Figure(layout="constrained")  # Use constrained layout for better spacing
+        canvas_3d = FigureCanvas(fig_3d)
+        ax_3d = fig_3d.add_subplot(111, projection='3d')
+
+        self.track_plots["3d"] = {
+            "figure": fig_3d,
+            "canvas": canvas_3d,
+            "ax": ax_3d
+        }
         
         tab_3d_page = QWidget()
         tab_3d_layout = QVBoxLayout(tab_3d_page)
         tab_3d_layout.setContentsMargins(0, 0, 0, 0)
-        tab_3d_layout.addWidget(self.canvas_3d)
+        tab_3d_layout.addWidget(canvas_3d)
         self.visual_tab_widget.addTab(tab_3d_page, "3D View")
 
-        # === Tab 2: 2D Visualization (Whole Track) ===
-        self.figure_2d_whole_track = Figure()
-        self.canvas_2d_whole_track = FigureCanvas(self.figure_2d_whole_track)
-        self.ax_whole_track = self.figure_2d_whole_track.add_subplot(111)
-        self.visual_tab_widget.addTab(self.canvas_2d_whole_track, "2D View (Whole Track)")
+        # === Rest of the Tab: 2D Visualization ===
+        tabs_2d = [
+            ("whole_track_topview", "2D View (Whole Track Top View)"),
+            ("whole_track_sideview", "2D View (Whole Track Side View)"),
+            ("section_12", "2D View (Sections 1/2)"),
+            ("section_3", "2D View (Sections 3)"),
+            ("section_45", "2D View (Sections 45)")
+        ]
 
-        # === Tab 3: 2D Visualization (Sections 1 & 2) ===
-        self.figure_2d_section_12 = Figure()
-        self.canvas_2d_section_12 = FigureCanvas(self.figure_2d_section_12)
-        self.ax_section_12 = self.figure_2d_section_12.add_subplot(111)
-        self.visual_tab_widget.addTab(self.canvas_2d_section_12, "2D View (Sections 1 & 2)")
+        for key, tab_title in tabs_2d:
+            # Creating the Matplotlib objects
+            fig = Figure()
+            canvas = FigureCanvas(fig)
+            ax = fig.add_subplot(111)
 
-        # Tab 4: 2D Visualization (Section 3) ===
-        self.figure_2d_section_3 = Figure()
-        self.canvas_2d_section_3 = FigureCanvas(self.figure_2d_section_3)
-        self.ax_section_3 = self.figure_2d_section_3.add_subplot(111)
-        self.visual_tab_widget.addTab(self.canvas_2d_section_3, "2D View (Section 3)")
-
-        # Tab 5: 2D Visualization (Sections 4 & 5) ===
-        self.figure_2d_section_45 = Figure()
-        self.canvas_2d_section_45 = FigureCanvas(self.figure_2d_section_45)
-        self.ax_section_45 = self.figure_2d_section_45.add_subplot(111)
-        self.visual_tab_widget.addTab(self.canvas_2d_section_45, "2D View (Sections 4 & 5)")
+            self.track_plots[key] = {
+                "figure": fig,
+                "canvas": canvas,
+                "ax": ax
+            }
+            
+            # Add to the tab widget
+            self.visual_tab_widget.addTab(canvas, tab_title)
 
         # Add to the main layout, with a scale factor of 3 to make it larger
         self.track_layout.addWidget(self.visual_widget, 3)
@@ -367,18 +376,22 @@ class MainWindow(QMainWindow):
         font_size = 8
         grid_padding = 5
 
+        for plot in self.track_plots.values():
+            plot["ax"].clear()
+
         # === 3D View ===
-        self.ax3d.clear()
         # This might look weird, but the axes are swapped to make the visualization more intuitive (X, Z, Y) instead of (X, Y, Z).
         # Right hand rule is used to determine the orientation of the axes, and this swap makes it easier to visualize the track in a more natural way.
         # X is the forward direction axis, Y is the left direction axis, and Z is the upward direction axis.
-        self.ax3d.plot3D(X, Z, Y, 'b-', label='Track Path')
-        self.ax3d.plot3D(X + Nx, Z + Nz, Y + Ny, 'r-', alpha=0.4, label='Normals')
-        self.ax3d.set_xlabel("X", fontsize=font_size)
-        self.ax3d.set_ylabel("Y", fontsize=font_size)
-        self.ax3d.set_zlabel("Z", fontsize=font_size)
-        self.ax3d.tick_params(axis='both', which='major', labelsize=font_size - 2)
-        self.ax3d.tick_params(axis='both', which='minor', labelsize=font_size - 4)
+        ax3d = self.track_plots["3d"]["ax"]
+        canvas_3d = self.track_plots["3d"]["canvas"]
+        ax3d.plot3D(X, Z, Y, 'b-', label='Track Path')
+        ax3d.plot3D(X + Nx, Z + Nz, Y + Ny, 'r-', alpha=0.4, label='Normals')
+        ax3d.set_xlabel("X", fontsize=font_size)
+        ax3d.set_ylabel("Y", fontsize=font_size)
+        ax3d.set_zlabel("Z", fontsize=font_size)
+        ax3d.tick_params(axis='both', which='major', labelsize=font_size - 2)
+        ax3d.tick_params(axis='both', which='minor', labelsize=font_size - 4)
         
         # Scale the 3D plot to fit the data better (A 1:1:1 aspect ratio for better visualization)
         x_range = np.max(X) - np.min(X)
@@ -388,57 +401,62 @@ class MainWindow(QMainWindow):
         box_x = x_range / max_range
         box_y = y_range / max_range
         box_z = z_range / max_range
-        self.ax3d.set_box_aspect((box_x, box_z, box_y))  # Adjust aspect ratio for better visualization
+        ax3d.set_box_aspect((box_x, box_z, box_y))  # Adjust aspect ratio for better visualization
 
-        self.ax3d.set_xlim(np.min(X) - grid_padding, np.max(X) + grid_padding)
-        self.ax3d.set_ylim(np.min(Z) - grid_padding, np.max(Z)+ grid_padding)
-        self.ax3d.set_zlim(np.min(Y) - grid_padding, np.max(Y) + grid_padding)
+        ax3d.set_xlim(np.min(X) - grid_padding, np.max(X) + grid_padding)
+        ax3d.set_ylim(np.min(Z) - grid_padding, np.max(Z)+ grid_padding)
+        ax3d.set_zlim(np.min(Y) - grid_padding, np.max(Y) + grid_padding)
 
-        self.ax3d.legend(loc='upper right', bbox_to_anchor=(1.0, 1.0), fontsize=font_size)
-        self.canvas_3d.draw()
+        ax3d.legend(loc='upper right', bbox_to_anchor=(1.0, 1.0), fontsize=font_size)
+        canvas_3d.draw()
 
         # === 2D View ===
-        # This is where the XY composition of the whole track is plotted in a 2D view.
-        self.ax_whole_track.clear()
-        self.ax_section_12.clear()
-        self.ax_section_3.clear()
-        self.ax_section_45.clear()
+        # Plotting the Top View
+        self.track_plots["whole_track_topview"]["ax"].plot(X, Z)
+
+        # Plotting the Side View (XY Composition of the Tracks)
         current_horizontal_offset = 0
         for idx, segment in enumerate(xy_composition):
             local_horizontal = segment["XY"]
             Z_elevation = segment["Z"]
 
             global_2d_horizontal = local_horizontal + current_horizontal_offset
-            self.ax_whole_track.plot(global_2d_horizontal, Z_elevation)
+            self.track_plots["whole_track_sideview"]["ax"].plot(global_2d_horizontal, Z_elevation)
 
+            # Also plot the whole track into 3 different sections
             if idx in (0, 1):
-                self.ax_section_12.plot(global_2d_horizontal, Z_elevation)
+                self.track_plots["section_12"]["ax"].plot(global_2d_horizontal, Z_elevation)
             elif idx == 2:
-                self.ax_section_3.plot(global_2d_horizontal, Z_elevation)
+                self.track_plots["section_3"]["ax"].plot(global_2d_horizontal, Z_elevation)
             elif idx in (3, 4):
-                self.ax_section_45.plot(global_2d_horizontal, Z_elevation)
+                self.track_plots["section_45"]["ax"].plot(global_2d_horizontal, Z_elevation)
 
             current_horizontal_offset = global_2d_horizontal[-1]  # Update the offset for the next segment
 
         # 2D View Settings
-        ax_list = [
-            (self.ax_whole_track, self.canvas_2d_whole_track, "Whole Track"),
-            (self.ax_section_12, self.canvas_2d_section_12, "Section 1-2"),
-            (self.ax_section_3, self.canvas_2d_section_3, "Section 3"),
-            (self.ax_section_45, self.canvas_2d_section_45, "Section 4-5")
+        view_configs = [
+            ("whole_track_topview", "Whole Track Top View", "X", "Y", False),
+            ("whole_track_sideview", "Whole Track Side View", "XY Composition", "Z Elevation", True),
+            ("section_12", "Section 1-2", "XY Composition", "Z Elevation", True),
+            ("section_3", "Section 3", "XY Composition", "Z Elevation", True),
+            ("section_45", "Section 4-5", "XY Composition", "Z Elevation", True)
         ]
 
-        for ax, canvas, title in ax_list:
+        for key, title, xlabel, ylabel, save_png in view_configs:
+            plot = self.track_plots[key]
+            ax, canvas = plot["ax"], plot["canvas"]
             ax.axis('scaled')
-            ax.set_xlabel("XY Composition", fontsize=font_size)
-            ax.set_ylabel("Z Elevation", fontsize=font_size)
+            ax.set_xlabel(xlabel, fontsize=font_size)
+            ax.set_ylabel(ylabel, fontsize=font_size)
             ax.set_title(title, fontsize=font_size)
             canvas.draw()
 
-            filename = f"{title.lower().replace(' ', '_')}.png"
-            ax.axis('off')  # Turn off the axis for saving the image
-            ax.figure.savefig(filename, dpi=300, bbox_inches='tight', pad_inches=0.1)
-            ax.axis('on')  # Turn the axis back on after saving the image
+            # Save image files if save_png is True
+            if save_png:
+                filename = f"{title.lower().replace(' ', '_')}.png"
+                ax.axis('off')  # Turn off axis labels for clean save
+                ax.figure.savefig(filename, dpi=300, bbox_inches='tight', pad_inches=0.1)
+                ax.axis('on')   # Restore axis visual elements for UI display
 
 
     # ========================================================================

@@ -1,10 +1,9 @@
-from scipy.integrate import solve_ivp
 import numpy as np
 import read_write_csv as CSV
 import build
 
-# All Track Parts
 # This class is used to store all track part functions
+# For all tracks, friction is negligible.
 class TrackPart:
     # This is used to initialize the TrackPart class
     # Could be used to later connect different track parts together
@@ -43,12 +42,9 @@ class TrackPart:
         pts = len(X)
         Y, Z = np.zeros(pts), np.zeros(pts)
         Nx, Ny, Nz = np.zeros(pts), np.ones(pts), np.zeros(pts)
+        
         Fx, Fy, Fz = np.ones(pts), np.ones(pts), np.ones(pts)
-
-        Fx[:-1] = X[1:] - X[:-1]
-        Fy[:-1] = Y[1:] - Y[:-1]
-        Fz[:-1] = Z[1:] - Z[:-1]
-
+        Fx[:-1], Fy[:-1], Fz[:-1] = np.diff(X), np.diff(Y), np.diff(Z)
         Fx[-1], Fy[-1], Fz[-1] = Fx[-2], Fy[-2], Fz[-2]
 
         Lx = Y * Fz - Z * Fy
@@ -132,28 +128,20 @@ class TrackPart:
 
         Z = np.zeros_like(X)
 
-        Nx = np.zeros(pts)
-        Ny = np.zeros(pts)
-        Nz = np.zeros(pts)
+        Nx, Ny, Nz = np.zeros(pts), np.zeros(pts), np.zeros(pts)
+        dx, dy = np.diff(X), np.diff(Y)
 
-        dx = X[1:] - X[:-1]
-        dy = Y[1:] - Y[:-1]
         hyp = np.sqrt(dx**2 + dy**2)
         hyp = np.where(hyp == 0, 1, hyp)  # Prevent division by zero
 
         tx = dx / hyp
         ty = dy / hyp
 
-        Nx[:-1] = -ty
-        Ny[:-1] = tx
-
-        Nx[-1] = Nx[-2]
-        Ny[-1] = Ny[-2]
+        Nx[:-1], Ny[:-1] = -ty, tx
+        Nx[-1], Ny[-1] = Nx[-2], Ny[-2]
 
         Fx, Fy, Fz = np.ones(pts), np.ones(pts), np.ones(pts)
-        Fx[:-1] = X[1:] - X[:-1]
-        Fy[:-1] = Y[1:] - Y[:-1]
-        Fz[:-1] = Z[1:] - Z[:-1]
+        Fx[:-1], Fy[:-1], Fz[:-1] = np.diff(X), np.diff(Y), np.diff(Z)
         Fx[-1], Fy[-1], Fz[-1] = Fx[-2], Fy[-2], Fz[-2]
 
         Lx = Y * Fz - Z * Fy
@@ -201,8 +189,8 @@ class TrackPart:
     @staticmethod
     def corkscrew_func(h):
         H = h * 4 # Total height of corkscrew
-        r1 = H/2 # Radius of corkscrew
-        B = 1/(2*r1)
+        r1 = H / 2 # Radius of corkscrew
+        B = 1 / (2*r1)
         l2 = (3*np.pi*(H-h)**0.5)/2
         l1 = (-3*h*np.pi/(2*l2)+((3*h*np.pi/(2*l2))**2+6*B*h)**0.5)/(2*B)
         A = h/(2*l1**3)-B/l1
@@ -232,6 +220,7 @@ class TrackPart:
         Y = np.concatenate([Y1, Y2, Y3])
         Z = np.concatenate([Z1, Z2, Z3])
         Phi = np.concatenate([Phi1, Phi2, Phi3])
+        pts = len(X)
 
         # Calculate Normal Vectors
         dX = np.concatenate(([X[0]], X[1:] - X[:-1]))[:, np.newaxis]
@@ -365,9 +354,9 @@ class TrackPart:
 
         Fx, Fy, Fz = np.diff(X, append=X[-1]), np.diff(Y, append=Y[-1]), np.diff(Z, append=Z[-1])
 
-        Lx = Y*Fz - Z*Fy
-        Ly = Z*Fx - X*Fz
-        Lz = X*Fy - Y*Fx
+        Lx = Y * Fz - Z * Fy
+        Ly = Z * Fx - X * Fz
+        Lz = X * Fy - Y * Fx
 
         pts = len(X)
         data = np.zeros((pts, 13))
@@ -412,25 +401,25 @@ class TrackPart:
         R = 2 * h
 
         # All X components to the track
-        X1 = np.arange(0, 3*R+1, 1) # Array of 1 from index 0 to 3*R
-        X2 = np.arange(3*R + 1, 4*R + 1, 1)
-        X3 = np.arange(4*R - 1, 2*R - 1, -1)
-        X4 = np.arange(2*R + 1, 4*R + 1, 1)
-        X5 = np.arange(4*R - 1, 3*R - 1, -1)
-        X6 = np.arange(3*R - 1, -1, -1)
+        X1 = np.arange(0, 3*R, 1) # Array of 1 from index 0 to 3*R
+        X2 = np.arange(3*R, 4*R, 1)
+        X3 = np.arange(4*R, 2*R, -1)
+        X4 = np.arange(2*R, 4*R, 1)
+        X5 = np.arange(4*R, 3*R, -1)
+        X6 = np.arange(3*R, -1, -1)
 
         # All Y components to the track
         Y1 = (h/2) * (1 - np.cos((np.pi*X1) / (3*R)))
         Y2345 = max(Y1) - (h/2) * (1 - np.cos(np.pi * (np.arange(1, 6*R+1, 1)) / (6*R)))
-        Y6 = np.arange(1, len(X6), 0)
+        Y6 = np.zeroes(len(X6))
 
         # All Z components to the track
-        Z1 = np.ones(len(X1))
+        Z1 = np.zeros(len(X1))
         Z2 = -R + np.sqrt(R**2 - (X2 - 3*R)**2)
         Z3 = -R - np.sqrt(R**2 - (X3 - 3*R)**2)
         Z4 = -R + np.sqrt(R**2 - (X4 - 3*R)**2)
         Z5 = -R - np.sqrt(R**2 - (X5 - 3*R)**2)
-        Z6 = np.arange(1, len(X6), -2*R)
+        Z6 = np.full(len(X6), -2*R)
 
         # All Phi components to the track (angle)
         Phi1 = (45/2) * (1 - np.cos((np.pi*X1) / (3*R)))
@@ -442,6 +431,10 @@ class TrackPart:
         Y = np.concatenate([Y1, Y2345, Y6])
         Z = np.concatenate([Z1, Z2, Z3, Z4, Z5, Z6])
         Phi = np.concatenate([Phi1, Phi2345, Phi6])
+
+        dX = np.concatenate(([X[0]], np.diff(X)))
+        dY = np.concatenate(([Y[0]], np.diff(Y)))
+        dZ = np.concatenate(([Z[0]], np.diff(Z)))
 
         return None
     
@@ -482,13 +475,10 @@ class TrackPart:
         dZ[0] = Z[1] - Z[0]
 
         # Standard backward difference for the rest of the array
-        dX[1:] = X[1:] - X[:-1]
-        dY[1:] = Y[1:] - Y[:-1]
-        dZ[1:] = Z[1:] - Z[:-1]
+        dX[1:], dY[1:], dZ[1:] = np.diff(X), np.diff(Y), np.diff(Z)
     
         dS = np.sqrt(dX**2 + dY**2 + dZ**2)
         dXZ = np.sqrt(dX**2 + dZ**2)
-
         dXZ_safe = np.where(dXZ == 0, 1e-12, dXZ)
         dS_safe = np.where(dS == 0, 1e-12, dS)
 
@@ -530,26 +520,14 @@ class TrackPart:
         Fy = np.ones(pts)
         Fz = np.ones(pts)
         
-        Fx[:-1] = X[1:] - X[:-1]
-        Fy[:-1] = Y[1:] - Y[:-1]
-        Fz[:-1] = Z[1:] - Z[:-1]
-        
-        Fx[-1] = Fx[-2]
-        Fy[-1] = Fy[-2]
-        Fz[-1] = Fz[-2]
+        Fx[:-1], Fy[:-1], Fz[:-1] = np.diff(X), np.diff(Y), np.diff(Z)
+        Fx[-1], Fy[-1], Fz[-1] = Fx[-2], Fy[-2], Fz[-2]
 
         Lx = Y * Fz - Z * Fy
         Ly = Z * Fx - X * Fz
         Lz = X * Fy - Y * Fx
 
-        data = np.column_stack((
-            np.arange(1, pts+1), # Starting index from 1 to pts
-            X, Y, Z,
-            Fx, Fy, Fz,
-            Lx, Ly, Lz,
-            Nx, Ny, Nz
-            ))
-        
+        data = np.column_stack((np.arange(1, pts+1), X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz))
         file_name = CSV.write_csv(data, pts, h, "rollback")
         track_content = X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name
         return track_content
@@ -596,7 +574,7 @@ class TrackPart:
     @staticmethod
     def combine_tracks(*parts):
         # Parts include the following:
-        # "section": the section of the track part (start, thrill, turn, end)
+        # "section": the section of the track part (Starts, Thrills 1, Turns, Thrills 2, Ends)
         # "type": the type of the track part
         # "arrays": the arrays of the track part (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name)
         # "v_exit": the exit velocity of the track part (if applicable)
@@ -604,14 +582,17 @@ class TrackPart:
             return None
         
         checks = {}
+        # Starting track is NOT included!!!
         for part in parts:
             section_key = part["section"]
             checks[section_key] = {
-                "velocities": None,
-                "radius": None,
-                "valley_check": None,
-                "inversion_check": None,
-                "peak_check": None
+                "velocities": None,         # Array of velocities at each point
+                "radius": None,             # Array of radius at each point
+                # Initially it doesn't pass any checks
+                "velocity_check": False,
+                "valley_check": False,
+                "inversion_check": False,
+                "peak_check": False
             }
 
         # === Combine the tracks together and finding the velocity ===
@@ -624,24 +605,40 @@ class TrackPart:
         # Goes through Thrills, Turns, and Ends
         for part in parts[1:]:
             section_key = part["section"]
+            section_type = part["type"]
 
             # Get the next parts data
             X2, Y2, Z2, Fx2, Fy2, Fz2, Lx2, Ly2, Lz2, Nx2, Ny2, Nz2 = [arr.ravel().astype(float) for arr in part["arrays"][:12]]
 
             # === Calculating the velocities for each section ===
-            part_velocities = TrackPhysics.velocity_check(v_exit, Y2, section=section_key)
+            part_velocities = TrackPhysics.calculate_velocity(v_exit, Y2)
             checks[section_key]["velocities"] = part_velocities
-            v_exit = part_velocities[-1]
+
+            passed, fail_index = TrackPhysics.velocity_check(part_velocities)
+            if passed:
+                checks[section_key]["velocity_check"] = True
+                v_exit = part_velocities[-1]
+            else:
+                v_exit = 0 # Coaster stopped tracking forward
 
             # === Calculating the R for each section ===
             # Technically it only needs to calculate the radius for Thrills and Turns
             if section_key != "Ends":
-                part_radius = TrackPhysics.calculate_R(xyz_component=(X2,Y2,Z2), forward_component=(Fx2,Fy2,Fz2), section=section_key)
+                part_radius = TrackPhysics.calculate_R(xyz_component=(X2,Y2,Z2), forward_component=(Fx2,Fy2,Fz2))
                 checks[section_key]["radius"] = part_radius
 
-            # Checking if its stored correctly
-            # print(f"{section_key}:\nVelocities {checks[section_key]["velocities"]}\nRadius {checks[section_key]["radius"]}")
+            # === After finding the V's and R's we do the checks ===
+            passed, fail_index, g_valley = TrackPhysics.valley_check(part_velocities[0], part_radius[0])
+            if passed:
+                checks[section_key]["valley_check"] = True
 
+            passed, fail_index = TrackPhysics.inversion_check(part_velocities[np.argmax(Y2)], part_radius[np.argmax(Y2)])
+            print(f"part_velocities[np.argmax(Y2)]")
+            if passed:
+                checks[section_key]["inversion_check"] = True
+
+
+            # After 
             if section_key in ("Thrills 2", "Ends"):
                 # If the part is a "Thrills 2" or "Ends" section, reverse the order of the arrays to ensure smooth connection
                 X2, Y2, Z2 = X2[::-1], Y2, Z2[::-1]
@@ -668,7 +665,7 @@ class TrackPart:
             Ny = np.concatenate([Ny, Ny2])
             Nz = np.concatenate([Nz, Nz2])
 
-        # Combine all the data into a single array and write to CSV
+        # === Combine all the data into a single array and write to CSV ===
         pts = len(X)
         data = np.column_stack((np.arange(1, pts+1), X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz))
         file_name = CSV.csv_noLimits_format(data, pts, 0, "combined_track")
@@ -714,14 +711,14 @@ class TrackPart:
 
         # Create a dictionary to store the combined track data and the XY composition of each track part
         combined_track = (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name)
-        return combined_track, xy_composition
+        return combined_track, xy_composition, checks
     
 
 
 # ========================== Physics Calculations for Track Design (TODO) ==========================
 class TrackPhysics:
     @staticmethod
-    def velocity_check(v_exit, Y_array, section="Track section"):
+    def calculate_velocity(v_exit, Y_array):
         # Check if the exit velocity from the previous track part is sufficient to navigate the next track part
         # This can be done by calculating the required velocity to navigate the next track part and comparing it to the exit velocity
         g = 9.8
@@ -732,19 +729,10 @@ class TrackPhysics:
         with np.errstate(invalid='ignore'):
             velocity_array = np.sqrt(v_squared)
         
-        if np.isnan(velocity_array).any():
-            first_fail_idx = np.where(np.isnan(velocity_array))[0][0]
-            fail_height = delta_y[first_fail_idx]
-
-            # If it fails this message will appear meaning the track part isn't able to make it through
-            raise ValueError(
-                f"Not enough velocity to go through {section} section of the track"
-            )
-        # print(f"{section} section's velocity: {velocity_array}")
         return velocity_array
 
     @staticmethod
-    def calculate_R(xyz_component, forward_component, section="Track section"):
+    def calculate_R(xyz_component, forward_component):
         X, Y, Z = xyz_component
         Fx, Fy, Fz = forward_component
 
@@ -772,23 +760,41 @@ class TrackPhysics:
         # radius = delta_S / delta_theta
         with np.errstate(divide='ignore', invalid='ignore'):
             radius = np.where(delta_theta == 0, np.inf, delta_S / delta_theta)
+        # Add another last element of the radius array to the end so it matches length of velocities
+        radius = np.append(radius, radius[-1])
 
         # print(f"{section} section's radius: {radius}")
         return radius
+    
+    @staticmethod
+    def velocity_check(velocity_array):
+        if np.isnan(velocity_array).any():
+            first_fail_idx = np.where(np.isnan(velocity_array))[0][0]
+            return False, first_fail_idx
+        
+        return True, None
 
     @staticmethod
-    def valley_check(v_exit, radius):
+    def valley_check(v_exit, r_1):
         # Check if the valley between two track parts is too deep for the given exit velocity
         # This can be done by calculating the potential energy at the lowest point of the valley and comparing it to the kinetic energy of the coaster at that point
-        g_valley = 9.8 + (v_exit**2 / radius)
+        g_valley = 9.8 + (v_exit**2 / r_1)
 
-        return g_valley
+        if g_valley > (5 * 9.8):
+            return False, r_1, g_valley
+
+        return True, None, None
 
     @staticmethod
-    def inversion_check(v_exit, radius):
+    def inversion_check(v_at_ymax, r_at_ymax):
         # Check if the radius of a loop or inversion is too small for the given exit velocity
         # This can be done by calculating the centripetal force required to navigate the loop and comparing it to the maximum g-force that riders can safely experience
-        return None
+        v_min = np.sqrt(r_at_ymax * 9.8)
+
+        if v_at_ymax < v_min:
+            return False, v_min
+
+        return True, None
 
     @staticmethod
     def peak_check(r, v_exit):

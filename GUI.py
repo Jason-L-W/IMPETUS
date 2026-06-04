@@ -8,6 +8,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.ticker import MultipleLocator
 from matplotlib.figure import Figure
 import numpy as np
 
@@ -523,11 +524,33 @@ class MainWindow(QMainWindow):
             wait.show()
             QApplication.processEvents()
             
-            # This would need to return two things, instead of 1 now because we need to also return the composition of XY
-            # The XY composition would be a dictionary with keys as the track type and the values as arrays of XY and Z data for each track segment.
-            # This would allow us to plot the XY composition of the track in a 2D view, while still keeping the 3D view intact.
-            combined_track, xy_composition = tracks.TrackPart.combine_tracks(*data)
+            combined_track, xy_composition, checks = tracks.TrackPart.combine_tracks(*data)
+            
+            # Checks --> Gives a warning message it checks fail
+            for section_key, section_data in checks.items():
+                if section_key == "Starts":
+                    continue
+
+                velocity_check = section_data.get("velocity_check")
+                valley_check = section_data.get("valley_check")
+                inversion_check = section_data.get("inversion_check")
+                peak_check = section_data.get("peak_check")
+
+                # if velocity_check is False:
+                #     QMessageBox.warning(
+                #         self,
+                #         "Physics Warnings",
+                #         f"There is not enough velocity to go through {section_key}"
+                #                         )
+                #     break
+
+                # This works
+                # print(valley_check)
+                print(f"{section_key}:{inversion_check}")
+            
+            # No matter if it fails or not, it builds the track
             self.update_visual(combined_track, xy_composition)  # Update the visualization with the combined track data and XY composition
+
 
             # Used later to display total length, total height, etc.
             X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name = combined_track

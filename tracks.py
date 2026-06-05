@@ -411,7 +411,7 @@ class TrackPart:
         # All Y components to the track
         Y1 = (h/2) * (1 - np.cos((np.pi*X1) / (3*R)))
         Y2345 = max(Y1) - (h/2) * (1 - np.cos(np.pi * (np.arange(1, 6*R+1, 1)) / (6*R)))
-        Y6 = np.zeroes(len(X6))
+        Y6 = np.zeros(len(X6))
 
         # All Z components to the track
         Z1 = np.zeros(len(X1))
@@ -581,28 +581,36 @@ class TrackPart:
         if not parts:
             return None
         
+        velocity_n_radius = {}
         checks = {}
         # Starting track is NOT included!!!
         for part in parts:
             section_key = part["section"]
-            checks[section_key] = {
+
+            velocity_n_radius[section_key] = {
                 "velocities": None,         # Array of velocities at each point
                 "radius": None,             # Array of radius at each point
+            }
+
+            checks[section_key] = {
                 # Initially it doesn't pass any checks
                 "velocity_check": False,
-                "valley_check": False,
-                "inversion_check": False,
-                "peak_check": False
+                "valley_check": None,
+                "inversion_check": None,
+                "peak_check": None,
+                "lateral_check": None,
+                "rollup_check": None,
+                "brake_check": None
             }
 
         # === Combine the tracks together and finding the velocity ===
         # Inital track (Starting Track)
         X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz = [arr.ravel().astype(float) for arr in parts[0]["arrays"][:12]]
-        
+
         # Get the inital velocity exiting from the starting track
         v_exit = parts[0]["v_exit"]
 
-        # Goes through Thrills, Turns, and Ends
+        # Goes through Thrills 1, Turns, Thrill 2, and Ends
         for part in parts[1:]:
             section_key = part["section"]
             section_type = part["type"]
@@ -612,33 +620,66 @@ class TrackPart:
 
             # === Calculating the velocities for each section ===
             part_velocities = TrackPhysics.calculate_velocity(v_exit, Y2)
-            checks[section_key]["velocities"] = part_velocities
+            velocity_n_radius[section_key]["velocities"] = part_velocities
 
             passed, fail_index = TrackPhysics.velocity_check(part_velocities)
             if passed:
                 checks[section_key]["velocity_check"] = True
                 v_exit = part_velocities[-1]
             else:
-                v_exit = 0 # Coaster stopped tracking forward
+                v_exit = 0.0 # Coaster stopped tracking forward
 
             # === Calculating the R for each section ===
             # Technically it only needs to calculate the radius for Thrills and Turns
-            if section_key != "Ends":
-                part_radius = TrackPhysics.calculate_R(xyz_component=(X2,Y2,Z2), forward_component=(Fx2,Fy2,Fz2))
-                checks[section_key]["radius"] = part_radius
+            part_radius = TrackPhysics.calculate_R(xyz_component=(X2,Y2,Z2), forward_component=(Fx2,Fy2,Fz2))
+            velocity_n_radius[section_key]["radius"] = part_radius
+
+            peak_idx = np.argmax(Y2)
+            v_bot, v_top = part_velocities[0], part_velocities[peak_idx]
+            r_bot, r_top = part_radius[0], part_radius[peak_idx]
 
             # === After finding the V's and R's we do the checks ===
-            passed, fail_index, g_valley = TrackPhysics.valley_check(part_velocities[0], part_radius[0])
-            if passed:
-                checks[section_key]["valley_check"] = True
+            # Valley Checks
+            if section_type in ("Loop", "Camelback", "Corkscrew", "Cobral Roll"):
+                val_passed, _ = TrackPhysics.valley_check(v_bot, r_bot)
+                checks[section_key]["valley_check"] = val_passed
 
-            passed, fail_index = TrackPhysics.inversion_check(part_velocities[np.argmax(Y2)], part_radius[np.argmax(Y2)])
-            print(f"part_velocities[np.argmax(Y2)]")
-            if passed:
-                checks[section_key]["inversion_check"] = True
+            # Inversion Checks
+            if section_type in ("Loop", "Corkscrew", "Cobral Roll"):
+                inv_passed, _ = TrackPhysics.inversion_check(v_top, r_top)
+                checks[section_key]["inversion_check"] = inv_passed
 
+            # Peak Checks
+            elif section_type == "Camelback":
+                peak_passed, _ = TrackPhysics.peak_check(v_top, r_top)
+                checks[section_key]["peak_check"] = peak_passed
 
-            # After 
+            # Lateral Checks
+            elif section_type in ("Horseshoe", "Helix") or section_key.startswith("Turns"):
+                # Extract normal tracking banking profile vector components at peak apex
+                nx, ny, nz = Nx2[peak_idx], Ny2[peak_idx], Nz2[peak_idx]
+                mag = np.sqrt(nx**2 + ny**2 + nz**2)
+                theta_rad = np.arccos(nz / mag) if mag > 1e-5 else 0.0
+
+                lat_passed, _ = TrackPhysics.lateral_check(v_top, r_top, theta_rad)
+                checks[section_key]["lateral_check"] = lat_passed
+
+            # Ends Check
+            elif section_type == "Rollup":
+                total_h = np.max(Y2) - Y2[0]
+                roll_passed, _ = TrackPhysics.rollup_check(v_bot, total_h)
+                checks[section_key]["rollup_check"] = roll_passed
+
+            elif section_type == "Brake":
+                # Fallbacks if track array metrics don't pass configuration lengths
+                track_L = np.sum(np.sqrt(np.diff(X2)**2 + np.diff(Y2)**2 + np.diff(Z2)**2))
+                default_decel = 4.5  # m/s^2 brake rate constraint
+                
+                brake_passed, _ = TrackPhysics.brake_check(v_bot, track_L)
+                checks[section_key]["brake_check"] = brake_passed
+            
+
+            # After Turns Section Invert Track
             if section_key in ("Thrills 2", "Ends"):
                 # If the part is a "Thrills 2" or "Ends" section, reverse the order of the arrays to ensure smooth connection
                 X2, Y2, Z2 = X2[::-1], Y2, Z2[::-1]
@@ -684,7 +725,7 @@ class TrackPart:
             seg_Z = Y[current_idx:end_idx]
             seg_Y = Z[current_idx:end_idx]
 
-            if part_type not in ("Loop",):
+            if part_type != "Loop":
                 dx = np.diff(seg_X, prepend=seg_X[0])
                 dy = np.diff(seg_Y, prepend=seg_Y[0])
                 distances = np.sqrt(dx**2 + dy**2)
@@ -711,20 +752,20 @@ class TrackPart:
 
         # Create a dictionary to store the combined track data and the XY composition of each track part
         combined_track = (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name)
-        return combined_track, xy_composition, checks
+        return combined_track, xy_composition, velocity_n_radius, checks
     
 
 
 # ========================== Physics Calculations for Track Design (TODO) ==========================
 class TrackPhysics:
+    g = 9.8
+
     @staticmethod
     def calculate_velocity(v_exit, Y_array):
         # Check if the exit velocity from the previous track part is sufficient to navigate the next track part
         # This can be done by calculating the required velocity to navigate the next track part and comparing it to the exit velocity
-        g = 9.8
-        
         delta_y = Y_array - Y_array[0]
-        v_squared = (v_exit ** 2) - (2 * g * delta_y)
+        v_squared = (v_exit ** 2) - (2 * TrackPhysics.g * delta_y)
 
         with np.errstate(invalid='ignore'):
             velocity_array = np.sqrt(v_squared)
@@ -775,35 +816,61 @@ class TrackPhysics:
         return True, None
 
     @staticmethod
-    def valley_check(v_exit, r_1):
+    def valley_check(v_bot, r_1):
         # Check if the valley between two track parts is too deep for the given exit velocity
         # This can be done by calculating the potential energy at the lowest point of the valley and comparing it to the kinetic energy of the coaster at that point
-        g_valley = 9.8 + (v_exit**2 / r_1)
-
-        if g_valley > (5 * 9.8):
-            return False, r_1, g_valley
-
-        return True, None, None
+        g_valley = TrackPhysics.g + (v_bot**2 / r_1)
+        if g_valley >= (5 * TrackPhysics.g):
+            return False, g_valley
+        return True, g_valley
 
     @staticmethod
     def inversion_check(v_at_ymax, r_at_ymax):
-        # Check if the radius of a loop or inversion is too small for the given exit velocity
-        # This can be done by calculating the centripetal force required to navigate the loop and comparing it to the maximum g-force that riders can safely experience
-        v_min = np.sqrt(r_at_ymax * 9.8)
+        if r_at_ymax <= 1e-3:
+            return False, 0.0
 
+        v_min = np.sqrt(r_at_ymax * TrackPhysics.g)
         if v_at_ymax < v_min:
             return False, v_min
-
-        return True, None
-
-    @staticmethod
-    def peak_check(r, v_exit):
-        # Check if the peak of a hill is too high for the given exit velocity
-        # This can be done by calculating the potential energy at the peak and comparing it to the kinetic energy of the coaster at that point
-        return None
+        return True, v_min
 
     @staticmethod
-    def gforce_check(r, v_exit):
-            # Check if the g-force experienced by riders at any point on the track exceeds safe limits
-            # This can be done by calculating the g-force at each point on the track and comparing it to a threshold value (e.g., 5g)
-            return None
+    def peak_check(v_at_max, r_at_ymax):
+        if r_at_ymax <= 1e-3:
+            return False, 0.0
+        
+        v_max = np.sqrt(r_at_ymax * TrackPhysics.g)
+        if v_at_max > v_max:
+            return False, v_max
+        return True, v_max
+
+    @staticmethod
+    def lateral_check(v_top, r, theta_rad):
+        # (v_top^2 / R) * cos(theta) - g * sin(theta) < 1.5g
+        if r <= 1e-3:
+            return False, 0.0
+        
+        lat_accel = ((v_top**2 / r) * np.cos(theta_rad)) - (TrackPhysics.g * np.sin(theta_rad))
+        max_allowed = 1.5 * TrackPhysics.g
+        
+        if np.abs(lat_accel) > max_allowed:
+            return False, lat_accel / TrackPhysics.g
+        return True, lat_accel / TrackPhysics.g
+
+    @staticmethod
+    def rollup_check(v_bot, h):
+        # h > (v_bot^2 / 2g) implies a stall risk
+        max_possible_h = (v_bot**2) / (2 * TrackPhysics.g)
+        if h >= max_possible_h:
+            return False, max_possible_h
+        return True, max_possible_h
+    
+    @staticmethod
+    # This will need to be tweek later on since it will need loop arounds
+    def brake_check(v_bot, L):
+        # v_max = sqrt(2 * a * L), check if v_bot < v_max
+        a_decel = 2
+        v_max = np.sqrt(2 * a_decel * L)
+        if v_bot > v_max:
+            return False, v_max
+        return True, v_max

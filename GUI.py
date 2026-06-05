@@ -20,8 +20,8 @@ import tracks
 SECTIONS = ["Starts", "Thrills 1", "Turns", "Thrills 2", "Ends"]    # Defines the sections of the track assembly
 STARTS = ["Launcher", "Lift Hill", "Rollback"]                     # Defines the starting track types
 THRILLS = ["Loop", "Camelback", "Corkscrew"]                        # Defines the thrill track types
-TURNS = ["Cobral Roll", "Horseshoe", "Helix[x]"]                 # Defines the turn track types
-ENDS = ["Brake", "Rollup[x]"]                                       # Defines the ending track types
+TURNS = ["Cobral Roll", "Horseshoe", "Helix"]                 # Defines the turn track types
+ENDS = ["Brake", "Rollup"]                                       # Defines the ending track types
 ALL_TRACKS = STARTS + THRILLS + TURNS + ENDS                        # Defines all track types for validation
 # ========================================================================
 
@@ -487,29 +487,41 @@ class MainWindow(QMainWindow):
                     return
 
                 # Check for valid track type and build the track segment
-                if track_type in ALL_TRACKS:
-                    build_func = track_function_map.get(track_type)
-                    if build_func:
-                        # If track type is a starting track, it will return both the track segment and the exit velocity,
-                        # otherwise it will just return the track segment.
-                        if track_type in STARTS:
-                            segment, v_exit = build_func(length_value)
-                            # Checks the exit velocity of the starting track.
-                            # print(f"Generated {track_type} with exit velocity: {v_exit[0]:.2f} m/s")
-                        else:
-                            segment = build_func(length_value)
+                if track_type not in ALL_TRACKS:
+                    QMessageBox.warning(self, "Unkown Track", f"Track type {track_type} is not recognized.")
+                    return
 
-                        # Appends to data an array list of track type and its data list
-                        # The data keeps tracks of section, type, and arrays for each track segment
-                        data.append({
-                            "section": section,
-                            "type": track_type,
-                            "arrays": segment,
-                            "v_exit": v_exit if track_type in STARTS else None
-                        })
-                    else:
-                        QMessageBox.warning(self, "Unknown Track", f"Track type {track_type} is not recognized.")
+                build_func = track_function_map.get(track_type)
+                if not build_func:
+                        QMessageBox.warning(self, "Missing Generator", f"No building rule found for {track_type}.")
                         return
+                
+                segment_v_exit = 0.0
+                result = build_func(length_value)
+
+                if track_type in STARTS:
+                    if isinstance(result, tuple) and len(result) == 2:
+                        segment, raw_v = result
+                        # Extract the float speed value if it's trapped in an array or tuple
+                        if hasattr(raw_v, "__len__"):
+                            segment_v_exit = float(raw_v[0])
+                        else:
+                            segment_v_exit = float(raw_v)
+                    else:
+                        segment = result
+                        segment_v_exit = 0.0
+                else:
+                    segment = result
+
+                # Appends to data an array list of track type and its data list
+                # The data keeps tracks of section, type, and arrays for each track segment
+                data.append({
+                    "section": section,
+                    "type": track_type,
+                    "arrays": segment,
+                    "v_exit": segment_v_exit
+                })
+
 
         # Check if there are valid tracks to assemble
         if not data:
@@ -524,41 +536,52 @@ class MainWindow(QMainWindow):
             wait.show()
             QApplication.processEvents()
             
-            combined_track, xy_composition, checks = tracks.TrackPart.combine_tracks(*data)
+            # print(f"DEBUG: Number of track segments being assembled: {len(data)}")
+            combined_track, xy_composition, velocity_n_radius, checks = tracks.TrackPart.combine_tracks(*data)
             
-            # Checks --> Gives a warning message it checks fail
+            warnings = []
+
             for section_key, section_data in checks.items():
                 if section_key == "Starts":
                     continue
 
-                velocity_check = section_data.get("velocity_check")
-                valley_check = section_data.get("valley_check")
-                inversion_check = section_data.get("inversion_check")
-                peak_check = section_data.get("peak_check")
+                if not section_data.get("velocity_check", True):
+                    warnings.append(f"• {section_key}: Not enough velocity to get through this section.")
+                
+                if section_data.get("valley_check") is False:
+                    warnings.append(f"• {section_key}: Valley G-force exceeds structural safety limits (>5G).")
+                
+                if section_data.get("inversion_check") is False:
+                    warnings.append(f"• {section_key}: Speed too low to clear inversion peak.")
+                
+                if section_data.get("peak_check") is False:
+                    warnings.append(f"• {section_key}: Speed too high over crest (Excess negative airborne Gs).")
 
-                # if velocity_check is False:
-                #     QMessageBox.warning(
-                #         self,
-                #         "Physics Warnings",
-                #         f"There is not enough velocity to go through {section_key}"
-                #                         )
-                #     break
+                if section_data.get("lateral_check") is False:
+                    warnings.append(f"• {section_key}: Lateral turning G-force forces exceed safe rider comfort (>1.5G).")
 
-                # This works
-                # print(valley_check)
-                print(f"{section_key}:{inversion_check}")
+                if section_data.get("rollup_check") is False:
+                    warnings.append(f"• {section_key}: Rollup incline is too tall. Train will stall.")
+
+                # if section_data.get("brake_check") is False:
+                #     warnings.append(f"• {section_key}: Entry speed into exceeds allowed stopping threshold.")
             
+            wait.close()
+
+            # Display physics failures to user if any occurred
+            if warnings:
+                warning_msg = "The track was built, but failed the following physics checks:\n\n" + "\n".join(warnings)
+                QMessageBox.warning(self, "Physics Warning", warning_msg)
+
             # No matter if it fails or not, it builds the track
             self.update_visual(combined_track, xy_composition)  # Update the visualization with the combined track data and XY composition
 
-
-            # Used later to display total length, total height, etc.
-            X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name = combined_track
-
-            wait.setText(f"Assembly Complete!\nCSV file generated: {file_name}")
-            wait.close()
+            file_name = combined_track[-1]
+            QMessageBox.information(self, "Success", f"Assembly Complete!\nCSV file generated: {file_name}")
 
         except Exception as e:
+            if 'wait' in locals() and wait.isVisible():
+                wait.close()
             QMessageBox.critical(self, "Assembly Error", f"An error occurred during assembly: {str(e)}")
 
 

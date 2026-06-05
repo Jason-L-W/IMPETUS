@@ -1,30 +1,44 @@
-# Things that need to be done
+# IMPETUS Rollercoaster
 
+---
 
-# cobraroll
-# S = theta * r
+### How to get this working on the school PC:
+Access the terminal through the Window's Search Bar &rarr; Type: terminal
+1) Open up terminal
+2) Download Git &rarr; Type: **winget install --id Git.Git -e --source winget**
+3) Download Python &rarr; Type: **winget install Python.Python.3.13** &rarr; When prompted input: **y** &rarr; Then: **ENTER**
+4) Close the terminal and reopen it
+5) Clone Repo &rarr; Type: **git clone https://github.com/Jason-L-W/IMPETUS.git**
+6) Go into the file &rarr; Type: **cd IMPETUS**
+7) Download the requirements &rarr; Type: **pip install -r requirements.txt**
+If step 7 doesn't work do the following:\
+&rarr; Go to Window's Search\
+&rarr; Type in App Execution Aliases\
+&rarr; Turn off App Installer for python.exe/ptyhon3.exe\
+&rarr; Close the terminal
+&rarr; Continue from Step 6
 
+8) Run the script &rarr; Type: **python GUI.py**
 
-# make a function that calculates the R (radius)
-# S = theta * r
-# Find change in S with 
-# Find change in theta with (thetax^2 + thetay^2 + thetaz^2)^(1/2)
+*Note*: If you receive a **winget** error, then your out of luck, change to a new PC.
 
-# do the inversion check / valley check / peak check
-# use red/green to check if they are correct to use
+---
 
-# find the velocity as v1_exits
+### How to remove the folder
+If you are in the IMPETUS folder:
+1) Get out of the IMPETUS folder &rarr; Type: **cd ..** once
+2) Remove the folder &rarr; Type: **Remove-Item -Recurse -Force IMPETUS**
 
+If you are not in the IMPETUS:
+1) Type in the terminal **ls** and check if you see a file name **IMPETUS**
+    (On the school PC, you should see it)
+2) Remove the folder &rarr; Type: **Remove-Item -Recurse -Force IMPETUS**
 
-L_min = v_1exit**2 / (2 * 9.81 * 1.5)
+### How to update the folder:
+1) Make sure you are already in the IMPETUS folder
+2) Update Using &rarr; Type: **git pull**
 
+### To access the photo's. Do the following:
+Type in the terminal &rarr; .\image.png
 
-
-
-# How to get this working
-1) Download Python --> winget install Python.Python.3.13
-2) Download Git --> winget install --id Git.Git -e --source winget
-3) Clone Repo --> git clone https://github.com/Jason-L-W/IMPETUS.git
-4) Go into the file --> cd IMPETUS
-5) Download the requirements --> pip install -r requirements.txt
-6) Run the script --> python GUI.py
+---

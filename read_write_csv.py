@@ -94,7 +94,6 @@ def csv_noLimits_format(data, pts, prop, elementname):
             coords = row[1:13]
             
             # Convert float items to scientific notation strings (e.g., 1.234560e+01)
-            # %e provides standard scientific notation format matching MATLAB's %e behavior
             formatted_coords = [f"{float(val):e}" for val in coords]
             
             # Combine the integer index with the formatted float coordinates

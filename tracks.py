@@ -148,14 +148,7 @@ class TrackPart:
         Ly = Z * Fx - X * Fz
         Lz = X * Fy - Y * Fx
 
-        data = np.column_stack((
-            np.arange(1, pts+1), # Starting index from 1 to pts
-            X, Y, Z,
-            Fx, Fy, Fz,
-            Lx, Ly, Lz,
-            Nx, Ny, Nz
-            ))
-        
+        data = np.column_stack((np.arange(1, pts+1), X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz))
         file_name = CSV.write_csv(data, pts, h, "rollback")
         track_content = X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name
         v_exit = np.sqrt(2 * 9.8 * h)
@@ -395,48 +388,101 @@ class TrackPart:
 
         return track_content
 
-    # Helix track part (TODO)
+    # Helix track part (done)
     @staticmethod
     def helix_func(h):
         R = 2 * h
 
         # All X components to the track
-        X1 = np.arange(0, 3*R, 1) # Array of 1 from index 0 to 3*R
-        X2 = np.arange(3*R, 4*R, 1)
-        X3 = np.arange(4*R, 2*R, -1)
-        X4 = np.arange(2*R, 4*R, 1)
-        X5 = np.arange(4*R, 3*R, -1)
-        X6 = np.arange(3*R, -1, -1)
+        X1 = np.arange(0, 3*R + 1, 1) 
+        X2 = np.arange(3*R + 1, 4*R + 1, 1)
+        X3 = np.arange(4*R - 1, 2*R - 1, -1)
+        X4 = np.arange(2*R + 1, 4*R + 1, 1)
+        X5 = np.arange(4*R - 1, 3*R - 1, -1)
+        X6 = np.arange(3*R - 1, -1, -1)
 
         # All Y components to the track
         Y1 = (h/2) * (1 - np.cos((np.pi*X1) / (3*R)))
-        Y2345 = max(Y1) - (h/2) * (1 - np.cos(np.pi * (np.arange(1, 6*R+1, 1)) / (6*R)))
+        Y2345 = np.max(Y1) - (h/2) * (1 - np.cos(np.pi * np.arange(1, 6*R + 1, 1) / (6*R)))
         Y6 = np.zeros(len(X6))
 
         # All Z components to the track
         Z1 = np.zeros(len(X1))
-        Z2 = -R + np.sqrt(R**2 - (X2 - 3*R)**2)
-        Z3 = -R - np.sqrt(R**2 - (X3 - 3*R)**2)
-        Z4 = -R + np.sqrt(R**2 - (X4 - 3*R)**2)
-        Z5 = -R - np.sqrt(R**2 - (X5 - 3*R)**2)
+        Z2 = -R + np.sqrt((R**2 - (X2 - 3*R)**2).astype(complex)).real
+        Z3 = -R - np.sqrt((R**2 - (X3 - 3*R)**2).astype(complex)).real
+        Z4 = -R + np.sqrt((R**2 - (X4 - 3*R)**2).astype(complex)).real
+        Z5 = -R - np.sqrt((R**2 - (X5 - 3*R)**2).astype(complex)).real
         Z6 = np.full(len(X6), -2*R)
 
         # All Phi components to the track (angle)
         Phi1 = (45/2) * (1 - np.cos((np.pi*X1) / (3*R)))
-        Phi2345 = 54.2 + 9.2*(-np.cos(np.pi * np.arange(1, 6*R-1, 1) / (6*R)))
-        Phi6 = 63.4 + (63.4/2) * (-1 + np.cos(np.pi*X1/(3*R)))
+        Phi2345 = 54.2 + 9.2 * (-np.cos(np.pi * np.arange(1, 6*R, 1) / (6*R)))
+        Phi6 = 63.4 + (63.4/2) * (-1 + np.cos(np.pi * X1 / (3*R)))
 
         # Combining compnents
         X = np.concatenate([X1, X2, X3, X4, X5, X6])
         Y = np.concatenate([Y1, Y2345, Y6])
         Z = np.concatenate([Z1, Z2, Z3, Z4, Z5, Z6])
         Phi = np.concatenate([Phi1, Phi2345, Phi6])
+        pts = len(X)
 
         dX = np.concatenate(([X[0]], np.diff(X)))
         dY = np.concatenate(([Y[0]], np.diff(Y)))
         dZ = np.concatenate(([Z[0]], np.diff(Z)))
 
-        return None
+        dS = np.sqrt(dX**2 + dY**2 + dZ**2)
+        dS_safe = np.where(dS == 0, 1e-12, dS)
+
+        dXZ = np.sqrt(dX**2 + dZ**2)
+        dXZ_safe = np.where(dXZ == 0, 1e-12, dXZ)
+
+        N = np.zeros((3, pts))
+        N[1, :] = np.cos(np.radians(Phi))
+        N[2, :] = -np.sin(np.radians(Phi))
+
+        # Vectorized Rotation Matrix Ry elements
+        # Ry shape: (3, 3, pts)
+        Ry = np.zeros((3, 3, pts))
+        Ry[0, 0, :] = dX / dXZ_safe
+        Ry[0, 2, :] = -dZ / dXZ_safe
+        Ry[1, 1, :] = 1.0
+        Ry[2, 0, :] = dZ / dXZ_safe
+        Ry[2, 2, :] = dX / dXZ_safe
+
+        # Vectorized Rotation Matrix Rz elements
+        # Rz shape: (3, 3, pts)
+        Rz = np.zeros((3, 3, pts))
+        Rz[0, 0, :] = dXZ / dS_safe
+        Rz[0, 1, :] = -dY / dS_safe
+        Rz[1, 0, :] = dY / dS_safe
+        Rz[1, 1, :] = dXZ / dS_safe
+        Rz[2, 2, :] = 1.0
+
+        # Perform N = Rz * Ry * N vectorially using np.einsum (Einstein summation)
+        # Multiplies 3x3 matrices by 3x1 vectors across all 'pts' simultaneously
+        Ry_N = np.einsum('ijm,jm->im', Ry, N)
+        N_rotated = np.einsum('ijm,jm->im', Rz, Ry_N)
+
+        Nx = N_rotated[0, :]
+        Ny = N_rotated[1, :]
+        Nz = N_rotated[2, :]
+
+        # Front Vector calculations
+        Fx = np.ones(pts)
+        Fy = np.ones(pts)
+        Fz = np.ones(pts)
+        
+        Fx[:-1], Fy[:-1], Fz[:-1] = np.diff(X), np.diff(Y), np.diff(Z)
+        Fx[-1], Fy[-1], Fz[-1] = Fx[-2], Fy[-2], Fz[-2]
+
+        Lx = Y * Fz - Z * Fy
+        Ly = Z * Fx - X * Fz
+        Lz = X * Fy - Y * Fx
+
+        data = np.column_stack((np.arange(1, pts+1), X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz))
+        file_name = CSV.write_csv(data, pts, h, "helix")
+        track_content = X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name
+        return track_content
     
     # Horseshoe roll track part (done)
     @staticmethod
@@ -528,7 +574,7 @@ class TrackPart:
         Lz = X * Fy - Y * Fx
 
         data = np.column_stack((np.arange(1, pts+1), X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz))
-        file_name = CSV.write_csv(data, pts, h, "rollback")
+        file_name = CSV.write_csv(data, pts, h, "horseshoe")
         track_content = X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name
         return track_content
 
@@ -561,10 +607,79 @@ class TrackPart:
         track_content = (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name)
         return track_content
 
-    # Rollup track part (TODO)
+    # Rollup track part (TODO - need to fix)
     @staticmethod
     def rollup_func(h):
-        return None
+        R = (2 / 3) * h
+
+        sin60 = np.sin(np.radians(60))
+        cos60 = np.cos(np.radians(60))
+        tan60 = np.tan(np.radians(60))
+
+        # --- 1. Position Generation (Using linspace for perfect uniform spacing) ---
+        arc_len = R * np.radians(60)
+        line_len = (2 * h) / (3 * sin60)
+        
+        # Estimate point counts to maintain roughly a 1-unit spacing smoothly
+        pts1 = max(2, int(np.round(arc_len)))
+        pts2 = max(2, int(np.round(line_len)))
+
+        # Segment 1: Circular Arc
+        theta1 = np.linspace(0, np.radians(60), pts1, endpoint=False)
+        X1 = R * np.sin(theta1)
+        Y1 = R * (1 - np.cos(theta1))
+
+        # Segment 2: Straight Line
+        x2_start = R * sin60
+        x2_end = (2 * h) / (3 * tan60) + x2_start
+        X2 = np.linspace(x2_start, x2_end, pts2)
+        Y2 = h / 3 + tan60 * (X2 - x2_start)
+
+        X = np.concatenate([X1, X2])
+        Y = np.concatenate([Y1, Y2])
+        Z = np.zeros(len(X))
+        pts = len(X)
+
+        # --- 2. Analytical Vector Generation (Flawless unit vectors) ---
+        # Segment 1 Unit Vectors (Arc)
+        Fx1 = np.cos(theta1)
+        Fy1 = np.sin(theta1)
+        Fz1 = np.zeros(pts1)
+
+        Nx1 = -np.sin(theta1)
+        Ny1 = np.cos(theta1)
+        Nz1 = np.zeros(pts1)
+
+        # Segment 2 Unit Vectors (Line)
+        Fx2 = np.full(pts2, cos60)
+        Fy2 = np.full(pts2, sin60)
+        Fz2 = np.zeros(pts2)
+
+        Nx2 = np.full(pts2, -sin60)
+        Ny2 = np.full(pts2, cos60)
+        Nz2 = np.zeros(pts2)
+
+        # Combine Forward (Tangent) and Up (Normal) vectors
+        Fx = np.concatenate([Fx1, Fx2])
+        Fy = np.concatenate([Fy1, Fy2])
+        Fz = np.concatenate([Fz1, Fz2])
+
+        Nx = np.concatenate([Nx1, Ny2])  # Wait, let's keep array mapping matching
+        Nx = np.concatenate([Nx1, Nx2])
+        Ny = np.concatenate([Ny1, Ny2])
+        Nz = np.concatenate([Nz1, Nz2])
+
+        # Left Vector (Binormal)
+        # For a flat 2D track lying on the XY-plane, the Left vector always points straight up along Z
+        Lx = np.zeros(pts)
+        Ly = np.zeros(pts)
+        Lz = np.ones(pts)
+
+        data = np.column_stack((np.arange(1, pts + 1), X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz))
+        file_name = CSV.write_csv(data, pts, h, "rollup")
+        track_content = (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name)
+        return track_content
+
 
 
     # =======================================================================
@@ -710,6 +825,14 @@ class TrackPart:
         pts = len(X)
         data = np.column_stack((np.arange(1, pts+1), X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz))
         file_name = CSV.csv_noLimits_format(data, pts, 0, "combined_track")
+
+        # Making a XYX component .txt file for SolidWorks
+        sw = np.column_stack((X, Y, Z))
+        matrix_diff = np.diff(sw, axis=0)
+        is_different = np.any(np.abs(matrix_diff) > 1e-5, axis=1)
+        cleaned_sw = np.vstack([sw[0], sw[1:][is_different]])
+        np.savetxt("to_solidwork.txt", cleaned_sw, fmt="%e", delimiter="\t")
+    
 
         # === Calculates the xy VS z composition of the track ===
         xy_composition = []

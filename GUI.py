@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import (
     QTabWidget, QFormLayout, QSlider, QScrollArea
 )
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QIcon
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.ticker import MultipleLocator
 from matplotlib.figure import Figure
@@ -18,10 +19,10 @@ import tracks
 
 # ========================================================================
 SECTIONS = ["Starts", "Thrills 1", "Turns", "Thrills 2", "Ends"]    # Defines the sections of the track assembly
-STARTS = ["Launcher", "Lift Hill", "Rollback"]                     # Defines the starting track types
+STARTS = ["Launcher", "Lift Hill", "Rollback"]                      # Defines the starting track types
 THRILLS = ["Loop", "Camelback", "Corkscrew"]                        # Defines the thrill track types
-TURNS = ["Cobral Roll", "Horseshoe", "Helix"]                 # Defines the turn track types
-ENDS = ["Brake", "Rollup"]                                       # Defines the ending track types
+TURNS = ["Cobral Roll", "Horseshoe", "Helix"]                       # Defines the turn track types
+ENDS = ["Brake", "Rollup"]                                          # Defines the ending track types
 ALL_TRACKS = STARTS + THRILLS + TURNS + ENDS                        # Defines all track types for validation
 # ========================================================================
 
@@ -41,11 +42,11 @@ track_function_map = {
     # Turns
     "Cobral Roll": tracks.TrackPart.cobrarollCG_func,
     "Horseshoe": tracks.TrackPart.horseshoe_func,
-    "Helix[x]": tracks.TrackPart.helix_func,
+    "Helix": tracks.TrackPart.helix_func,
 
     # Ends
     "Brake": tracks.TrackPart.brake_func,                   # Using this will result a return to the beginning of the track
-    "Rollup[x]": tracks.TrackPart.rollup_func               # Has no return, but can be used to end the track with a rollup
+    "Rollup": tracks.TrackPart.rollup_func               # Has no return, but can be used to end the track with a rollup
 
 }
 
@@ -240,7 +241,8 @@ class MainWindow(QMainWindow):
         self.single_page_main_layout.setContentsMargins(5, 5, 5, 5)
         self.single_page_main_layout.setSpacing(10)
 
-        self.single_page_card_layouts = {}
+        self.single_page_cards_layouts = {}
+        self.single_page_cards = {}
         for section in SECTIONS:
             card = QWidget()
             card.setStyleSheet("background-color: #ffffff; border-radius: 10px; margin-bottom: 2px; padding: 2px;")
@@ -254,7 +256,8 @@ class MainWindow(QMainWindow):
             title.setAlignment(Qt.AlignmentFlag.AlignCenter)
             card_layout.addWidget(title)
             
-            self.single_page_card_layouts[section] = card_layout
+            self.single_page_cards_layouts[section] = card_layout
+            self.single_page_cards[section] = card
             self.single_page_main_layout.addWidget(card)
             
         self.single_page_main_layout.addStretch()
@@ -270,6 +273,7 @@ class MainWindow(QMainWindow):
         """)
 
         self.tab_layouts = {}
+        self.tab_widgets = {}
         for section in SECTIONS:
             tab_widget = QWidget()
             tab_widget.setStyleSheet("background-color: #ffffff; border-radius: 10px; border-top-left-radius: 0px; padding: 10px;")
@@ -277,6 +281,7 @@ class MainWindow(QMainWindow):
             tab_layout.setContentsMargins(5, 5, 5, 5)
             
             self.tab_layouts[section] = tab_layout
+            self.tab_widgets[section] = tab_widget
             self.assembly_tabs.addTab(tab_widget, section)
             
         self.assembly_stack.addWidget(self.assembly_tabs)
@@ -286,7 +291,7 @@ class MainWindow(QMainWindow):
 
         for section in SECTIONS:
             if index == 0:
-                target_layout = self.single_page_card_layouts[section]
+                target_layout = self.single_page_cards_layouts[section]
             else:
                 target_layout = self.tab_layouts[section]
                 
@@ -416,13 +421,19 @@ class MainWindow(QMainWindow):
         self.track_plots["whole_track_topview"]["ax"].plot(X, Z)
 
         # Plotting the Side View (XY Composition of the Tracks)
+        segment_boundaries = {}
         current_horizontal_offset = 0
         for idx, segment in enumerate(xy_composition):
             local_horizontal = segment["XY"]
             Z_elevation = segment["Z"]
-
             global_2d_horizontal = local_horizontal + current_horizontal_offset
+            
             self.track_plots["whole_track_sideview"]["ax"].plot(global_2d_horizontal, Z_elevation)
+
+            segment_boundaries[idx] = {
+                "start_x": global_2d_horizontal[0],
+                "end_x": global_2d_horizontal[-1],
+            }
 
             # Also plot the whole track into 3 different sections
             if idx in (0, 1):
@@ -436,14 +447,14 @@ class MainWindow(QMainWindow):
 
         # 2D View Settings
         view_configs = [
-            ("whole_track_topview", "Whole Track Top View", "X", "Y", False),
-            ("whole_track_sideview", "Whole Track Side View", "XY Composition", "Z Elevation", True),
-            ("section_12", "Section 1-2", "XY Composition", "Z Elevation", True),
-            ("section_3", "Section 3", "XY Composition", "Z Elevation", True),
-            ("section_45", "Section 4-5", "XY Composition", "Z Elevation", True)
+            ("whole_track_topview",     "Whole Track Top View",     "X",    "Y"),
+            ("whole_track_sideview",    "Whole Track Side View",    "XY",   "Z"),
+            ("section_12",              "Section 1-2",              "XY",   "Z"),
+            ("section_3",               "Section 3",                "XY",   "Z"),
+            ("section_45",              "Section 4-5",              "XY",   "Z")
         ]
 
-        for key, title, xlabel, ylabel, save_png in view_configs:
+        for key, title, xlabel, ylabel in view_configs:
             plot = self.track_plots[key]
             ax, canvas = plot["ax"], plot["canvas"]
             ax.axis('scaled')
@@ -451,13 +462,64 @@ class MainWindow(QMainWindow):
             ax.set_ylabel(ylabel, fontsize=font_size)
             ax.set_title(title, fontsize=font_size)
             canvas.draw()
+                
+            filename = f"{title.lower().replace(' ', '_')}.png"
+            temp_elements = []
 
-            # Save image files if save_png is True
-            if save_png:
-                filename = f"{title.lower().replace(' ', '_')}.png"
-                ax.axis('off')  # Turn off axis labels for clean save
-                ax.figure.savefig(filename, dpi=300, bbox_inches='tight', pad_inches=0.1)
-                ax.axis('on')   # Restore axis visual elements for UI display
+            if key == "whole_track_sideview":
+                y_min, y_max = ax.get_ylim()
+                padding = (y_max - y_min) * 0.8
+                new_y_min = y_min - padding
+                ax.set_ylim(bottom=new_y_min)
+
+                canvas_floor_y = new_y_min                   # Absolute bottom of the image
+                upper_hline_y = new_y_min + (padding * 0.85) # Upper bounding line
+                lower_hline_y = new_y_min + (padding * 0.35) # Lower bounding line
+                label_y = new_y_min + (padding * 0.60)       # Center of the text
+
+                global_start_x = segment_boundaries[0]["start_x"]
+                global_end_x = segment_boundaries[max(segment_boundaries.keys())]["end_x"]
+                
+                # Upper Horizontal Line
+                upper_hline, = ax.plot([global_start_x, global_end_x], [upper_hline_y, upper_hline_y], color='red', linestyle='-', linewidth=0.6, zorder=1)
+                temp_elements.append(upper_hline)
+                # Lower Horizontal Line
+                lower_hline, = ax.plot([global_start_x, global_end_x], [lower_hline_y, lower_hline_y], color='blue', linestyle='-', linewidth=0.6, zorder=1)
+                temp_elements.append(lower_hline)
+
+                # First Vertical Line
+                first_vline, = ax.plot([global_start_x, global_start_x], [canvas_floor_y, upper_hline_y], color='gray', linestyle='-', linewidth=0.6, zorder=1)
+                temp_elements.append(first_vline)
+                # Last Vertical Line
+                last_vline, = ax.plot([global_end_x, global_end_x], [canvas_floor_y, upper_hline_y], color='gray', linestyle='-', linewidth=0.6, zorder=1)
+                temp_elements.append(last_vline)
+
+                for idx, bounds in segment_boundaries.items():
+                    start_x, end_x = bounds["start_x"], bounds["end_x"]
+                    mid_x = (start_x + end_x) / 2.0
+                    label_text = f"Section {idx+1}"
+                    section_name = ax.text(x=mid_x, y=label_y, s=label_text, fontsize=font_size * 0.6, color='black', ha='center', va='center')
+                    temp_elements.append(section_name)
+
+                    # Subsequent vertical lines
+                    if idx < len(segment_boundaries) - 1:
+                        sub_vline, = ax.plot([end_x, end_x], [canvas_floor_y, lower_hline_y], color='gray', linestyle='-', linewidth=0.6, zorder=2)
+                        temp_elements.append(sub_vline)
+
+            ax.axis('off')  # Hide axis elements for a clean image
+            ax.set_title(title, fontsize=font_size * 0.5)
+            ax.figure.savefig(filename, dpi=300, bbox_inches='tight', pad_inches=0.1)
+            ax.set_title(title, fontsize=font_size)
+            ax.axis('on')   # Restore axis elements for UI display
+
+            # Remove temp
+            for element in temp_elements:
+                element.remove()
+
+            # Restore original limits if they were altered
+            if key == "whole_track_sideview":
+                ax.set_ylim(y_min, y_max)
+
 
 
     # ========================================================================
@@ -540,32 +602,47 @@ class MainWindow(QMainWindow):
             combined_track, xy_composition, velocity_n_radius, checks = tracks.TrackPart.combine_tracks(*data)
             
             warnings = []
-
             for section_key, section_data in checks.items():
                 if section_key == "Starts":
                     continue
 
+                section_passed = True
+
                 if not section_data.get("velocity_check", True):
                     warnings.append(f"• {section_key}: Not enough velocity to get through this section.")
-                
+                    section_passed = False
+
                 if section_data.get("valley_check") is False:
                     warnings.append(f"• {section_key}: Valley G-force exceeds structural safety limits (>5G).")
-                
+                    section_passed = False
+
                 if section_data.get("inversion_check") is False:
                     warnings.append(f"• {section_key}: Speed too low to clear inversion peak.")
-                
+                    section_passed = False
+
                 if section_data.get("peak_check") is False:
                     warnings.append(f"• {section_key}: Speed too high over crest (Excess negative airborne Gs).")
+                    section_passed = False
 
                 if section_data.get("lateral_check") is False:
                     warnings.append(f"• {section_key}: Lateral turning G-force forces exceed safe rider comfort (>1.5G).")
+                    section_passed = False
 
                 if section_data.get("rollup_check") is False:
                     warnings.append(f"• {section_key}: Rollup incline is too tall. Train will stall.")
+                    section_passed = False
 
                 # if section_data.get("brake_check") is False:
                 #     warnings.append(f"• {section_key}: Entry speed into exceeds allowed stopping threshold.")
-            
+
+                if section_key in self.single_page_cards:
+                    card_widget = self.single_page_cards[section_key]
+                    if section_passed:
+                        card_widget.setStyleSheet("background-color: #2ecc71; color: #ffffff; border-radius: 10px; margin-bottom: 2px; padding: 2px;")
+                    else:
+                        card_widget.setStyleSheet("background-color: #e74c3c; color: #ffffff; border-radius: 10px; margin-bottom: 2px; padding: 2px;")
+
+
             wait.close()
 
             # Display physics failures to user if any occurred

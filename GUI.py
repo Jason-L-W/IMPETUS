@@ -112,7 +112,7 @@ class MainWindow(QMainWindow):
         self.setup_selector.addItems(["Setup 1: All on 1 Page", "Setup 2: Tabbed View"])
         self.setup_selector.setStyleSheet("""
             QComboBox { background-color: white; color: #2c3e50; padding: 6px; border-radius: 5px; font-weight: bold; }
-            QComboBox QAbstractItemView { background-color: white; border-radius: 5px; }
+            QComboBox QAbstractItemView { background-color: white; border-radius: 5px; font-weight: bold; }
                                           """)
         selector_layout.addWidget(selector_label)
         selector_layout.addWidget(self.setup_selector)
@@ -162,7 +162,7 @@ class MainWindow(QMainWindow):
 
         # Inital Tab Widget (Hidden until assembly is complete)
         self.visual_tab_widget = QTabWidget()
-        self.visual_tab_widget.setStyleSheet("background-color: white; color: black;")
+        self.visual_tab_widget.setStyleSheet("background-color: white; color: black; font-weight: bold;")
         self.visual_tab_widget.hide()
         self.visual_constent_layout.addWidget(self.visual_tab_widget)
 
@@ -233,7 +233,7 @@ class MainWindow(QMainWindow):
     def single_page_view(self):
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
-        scroll_area.setStyleSheet("border: none; background: transparent;")
+        scroll_area.setStyleSheet("border: none; background: transparent; font-size: 12px; font-weight: bold;")
         
         self.single_page_widget = QWidget()
         self.single_page_widget.setStyleSheet("background-color: #ecf0f1; border-radius: 10px; padding: 10px;")
@@ -267,8 +267,8 @@ class MainWindow(QMainWindow):
     def tabbed_view(self):
         self.assembly_tabs = QTabWidget()
         self.assembly_tabs.setStyleSheet("""
-            QTabWidget::panel {background-color: #ecf0f1; border-radius: 10px; padding: 10px;}
-            QTabBar::tab {background-color: #2c3e50; color: white; padding: 8px 16px; border-top-left-radius: 6px; border-top-right-radius: 6px; margin-right: 2px;}
+            QTabWidget::panel {background-color: #ecf0f1; border-radius: 10px; padding: 10px; font-weight: bold;}
+            QTabBar::tab {background-color: #2c3e50; color: white; padding: 8px 16px; border-top-left-radius: 6px; border-top-right-radius: 6px; margin-right: 2px; font-weight: bold;}
             QTabBar::tab:selected {background-color: #ffffff; color: #2c3e50; font-weight: bold;}
         """)
 
@@ -276,7 +276,7 @@ class MainWindow(QMainWindow):
         self.tab_widgets = {}
         for section in SECTIONS:
             tab_widget = QWidget()
-            tab_widget.setStyleSheet("background-color: #ffffff; border-radius: 10px; border-top-left-radius: 0px; padding: 10px;")
+            tab_widget.setStyleSheet("background-color: #ffffff; border-radius: 10px; border-top-left-radius: 0px; padding: 10px; font-weight: bold;")
             tab_layout = QVBoxLayout(tab_widget)
             tab_layout.setContentsMargins(5, 5, 5, 5)
             

@@ -11,16 +11,33 @@ import csv
 def read_csv(file_name):
     all_data = []
     try:
-        with open(f"{file_name}", newline="") as csvfile:
-            reader = csv.reader(csvfile)
-            if reader is None: # No data
+        with open(f"Prebuilt_tracks/{file_name}", "r", newline="", encoding="utf-8") as csvfile:
+            # Peek at the first line to detect the delimiter
+            first_line = csvfile.readline()
+            if not first_line.strip(): 
                 print(f"Error: No data found in file '{file_name}'.")
                 return None
             
-            next(reader) # Skips Header
-            for row in reader: # Read each row
-                try: # Convert each value to float and append to all_data
-                    all_data.append([float(v) for v in row])
+            # Reset file pointer back to the beginning
+            csvfile.seek(0) 
+            
+            # Dynamically choose parser based on whether a comma is present
+            if ',' in first_line:
+                reader = csv.reader(csvfile, delimiter=',')
+            else:
+                # Custom generator to handle arbitrary spaces/tabs smoothly
+                reader = (line.split() for line in csvfile)
+            
+            # Skip Header
+            next(reader) 
+            
+            # Read each row
+            for row in reader: 
+                if not row:  # Skip empty rows
+                    continue
+                try: 
+                    # Convert values to float (stripping quotes just in case)
+                    all_data.append([float(v.strip('"\'')) for v in row])
                 except ValueError as e:
                     print(f"Warning: Could not convert row {row} ({e})")
 
@@ -40,7 +57,7 @@ def read_csv(file_name):
 # Gets the data, points, track properties (length, height, radius), and track name and convert it into a csv
 def write_csv(data, pts, prop, elementname):
     # Make the filename for CSV (function_Length_Index)
-    file_name = f"{elementname}_{prop}.csv"
+    file_name = f"Segments/{elementname}_{prop}.csv"
     # Open the file and write the following into it
     with open(file_name, mode="w", newline="") as f:
         writer = csv.writer(f)

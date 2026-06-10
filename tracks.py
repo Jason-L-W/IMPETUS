@@ -16,7 +16,8 @@ class TrackPart:
     # ========================== Any track given data ==========================
     # Given data (csv file) of a real track, this function will read the data and return the track
     # part which is scaled, based on the user input.
-    def from_data(data, scale, name):
+    def from_data(scale, track_name):
+        data = CSV.read_csv(f"{track_name}.csv")
         track_data = data.copy()
 
         # Scales the track based on your input scale
@@ -28,8 +29,9 @@ class TrackPart:
         Nx, Ny, Nz = track_data[:, 10], track_data[:, 11], track_data[:, 12]
 
         pts = len(track_data)
-        file_name = CSV.write_csv(track_data, pts, scale, name)
-        return X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name
+        file_name = CSV.write_csv(track_data, pts, scale, track_name)
+        track_content = X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name
+        return track_content
 
 
     # ========================================================================
@@ -51,14 +53,7 @@ class TrackPart:
         Ly = Z * Fx - X * Fz
         Lz = X * Fy - Y * Fx
 
-        data = np.column_stack((
-            np.arange(1, pts+1), # Starting index from 1 to pts
-            X, Y, Z,
-            Fx, Fy, Fz,
-            Lx, Ly, Lz,
-            Nx, Ny, Nz
-            ))
-        
+        data = np.column_stack((np.arange(1, pts+1), X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz))
         file_name = CSV.write_csv(data, pts, L, "launcher")
         track_content = X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name
         
@@ -183,24 +178,26 @@ class TrackPart:
     def corkscrew_func(h):
         H = h * 4 # Total height of corkscrew
         r1 = H / 2 # Radius of corkscrew
-        B = 1 / (2*r1)
-        l2 = (3*np.pi*(H-h)**0.5)/2
-        l1 = (-3*h*np.pi/(2*l2)+((3*h*np.pi/(2*l2))**2+6*B*h)**0.5)/(2*B)
+        B = 1 / (2 * r1)
+        l2 = (3 * np.pi * np.sqrt(H - h)) / 2        
+        l1 = (-3 * h * np.pi / (2*l2) + np.sqrt((3 * h *np.pi / (2 * l2))**2 + 6 * B * h)) / (2 * B)
         A = h/(2*l1**3)-B/l1
 
         # Section 1 (Track before the loop)
         X1 = np.linspace(0, l1, 50)
-        Y1 = (A * X1**3) + (B * X1**2)
+        t_norm1 = X1 / l1
+        smooth_modifier = (3 * t_norm1**2 - 2 * t_norm1**3)
+        Y1 = ((A * X1**3) + (B * X1**2)) * smooth_modifier
         Z1 = np.zeros_like(X1)
-        Phi1 = np.linspace(0, -90, len(X1))
+        Phi1 = -90 * (0.5 - 0.5 * np.cos(np.pi * t_norm1))
 
         # Section 2 (Track for the loop of corkscrew)
         l2 = (3 * np.pi / 2) * (H - h)**0.5
-        t = np.arange(0, 3*np.pi, 0.01)
-        X2 = l2 * t / (3*np.pi) + X1[-1]
-        Y2 = (h/2) * (1+np.sin(t)) # Responsible for the loop angle
-        Z2 = (h/2) * (1-np.cos(t)) + Z1[-1] # Offset to the side, so that the track doesn't turn into itself
-        Phi2 = -90 - (540/(3*np.pi))*t
+        t = np.arange(0, 3 * np.pi, 0.01)
+        X2 = l2 * t / (3 * np.pi) + X1[-1]
+        Y2 = (h / 2) * (1 + np.sin(t)) # Responsible for the loop angle
+        Z2 = (h / 2) * (1 - np.cos(t)) + Z1[-1] # Offset to the side, so that the track doesn't turn into itself
+        Phi2 = -90 - (540 / (3 * np.pi))*t
 
         # Section 3 (Track after the loop)
         X3 = np.linspace(0, l1, len(X1)) + X2[-1]
@@ -284,11 +281,9 @@ class TrackPart:
         data = np.column_stack((np.arange(1, pts+1), X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz))
         file_name = CSV.write_csv(data, pts, r1, "corkscrew")
         track_content = (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name)
-
         return track_content
 
-        # ========================== Loop with constant G-force (possibly need to fix) ==========================
-    
+    # ========================== Loop with constant G-force (possibly need to fix) ==========================
     # Loop with constant G-force (done)
     # This also needs to return the height, r1, and r2 of the loop
     @staticmethod
@@ -616,7 +611,6 @@ class TrackPart:
         cos60 = np.cos(np.radians(60))
         tan60 = np.tan(np.radians(60))
 
-        # --- 1. Position Generation (Using linspace for perfect uniform spacing) ---
         arc_len = R * np.radians(60)
         line_len = (2 * h) / (3 * sin60)
         
@@ -640,7 +634,6 @@ class TrackPart:
         Z = np.zeros(len(X))
         pts = len(X)
 
-        # --- 2. Analytical Vector Generation (Flawless unit vectors) ---
         # Segment 1 Unit Vectors (Arc)
         Fx1 = np.cos(theta1)
         Fy1 = np.sin(theta1)
@@ -718,11 +711,11 @@ class TrackPart:
                 "brake_check": None
             }
 
-        # === Combine the tracks together and finding the velocity ===
+        # === Combine the tracks together ===
         # Inital track (Starting Track)
         X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz = [arr.ravel().astype(float) for arr in parts[0]["arrays"][:12]]
 
-        # Get the inital velocity exiting from the starting track
+        # Get the velocity exiting from the starting track
         v_exit = parts[0]["v_exit"]
 
         # Goes through Thrills 1, Turns, Thrill 2, and Ends
@@ -755,12 +748,12 @@ class TrackPart:
 
             # === After finding the V's and R's we do the checks ===
             # Valley Checks
-            if section_type in ("Loop", "Camelback", "Corkscrew", "Cobral Roll"):
+            if section_type in ("Loop", "Camelback", "Corkscrew", "Cobral Roll", "test"):
                 val_passed, _ = TrackPhysics.valley_check(v_bot, r_bot)
                 checks[section_key]["valley_check"] = val_passed
 
             # Inversion Checks
-            if section_type in ("Loop", "Corkscrew", "Cobral Roll"):
+            if section_type in ("Loop", "Corkscrew", "Cobral Roll", "test"):
                 inv_passed, _ = TrackPhysics.inversion_check(v_top, r_top)
                 checks[section_key]["inversion_check"] = inv_passed
 
@@ -787,14 +780,12 @@ class TrackPart:
 
             elif section_type == "Brake":
                 # Fallbacks if track array metrics don't pass configuration lengths
-                track_L = np.sum(np.sqrt(np.diff(X2)**2 + np.diff(Y2)**2 + np.diff(Z2)**2))
-                default_decel = 4.5  # m/s^2 brake rate constraint
-                
+                track_L = np.sum(np.sqrt(np.diff(X2)**2 + np.diff(Y2)**2 + np.diff(Z2)**2))                
                 brake_passed, _ = TrackPhysics.brake_check(v_bot, track_L)
                 checks[section_key]["brake_check"] = brake_passed
             
 
-            # After Turns Section Invert Track
+            # === After Turns Section Invert Track ===
             if section_key in ("Thrills 2", "Ends"):
                 # If the part is a "Thrills 2" or "Ends" section, reverse the order of the arrays to ensure smooth connection
                 X2, Y2, Z2 = X2[::-1], Y2, Z2[::-1]
@@ -821,17 +812,23 @@ class TrackPart:
             Ny = np.concatenate([Ny, Ny2])
             Nz = np.concatenate([Nz, Nz2])
 
+        # === Check to loop back to the start or not ===
+        if not (parts[0]["type"] == "Rollback" or parts[-1]["type"] == "Rollup"):
+            temp = X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz
+            X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz = TrackPart.add_loop_back(temp)
+
         # === Combine all the data into a single array and write to CSV ===
         pts = len(X)
         data = np.column_stack((np.arange(1, pts+1), X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz))
         file_name = CSV.csv_noLimits_format(data, pts, 0, "combined_track")
 
-        # Making a XYX component .txt file for SolidWorks
-        sw = np.column_stack((X, Y, Z))
-        matrix_diff = np.diff(sw, axis=0)
+        # === Data for SolidWorks ===
+        # Clean up the data so that its viable to be used by SolidWorks for 3D printing
+        sw_data = np.column_stack((X, Y, Z))
+        matrix_diff = np.diff(sw_data, axis=0)
         is_different = np.any(np.abs(matrix_diff) > 1e-5, axis=1)
-        cleaned_sw = np.vstack([sw[0], sw[1:][is_different]])
-        np.savetxt("to_solidwork.txt", cleaned_sw, fmt="%e", delimiter="\t")
+        cleaned_sw_data = np.vstack([sw_data[0], sw_data[1:][is_different]])
+        np.savetxt("to_solidwork.txt", cleaned_sw_data, fmt="%e", delimiter="\t")
     
 
         # === Calculates the xy VS z composition of the track ===
@@ -877,6 +874,83 @@ class TrackPart:
         combined_track = (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name)
         return combined_track, xy_composition, velocity_n_radius, checks
     
+    # =======================================================================
+    #           Loops the end back to the beginning of the track
+    # =======================================================================
+    @staticmethod
+    def add_loop_back(combined_track):
+        X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz = combined_track
+
+        # Start and end
+        x_start, y_start, z_start = X[0], Y[0], Z[0]
+        x_end, y_end, z_end = X[-1], Y[-1], Z[-1]
+
+        station_length = 5
+        n_straight = 30
+        n_arc = 80
+
+        # Connector should stay on ground/elevation level
+        y_ground = 0
+
+        # Extend farther in negative X direction before turning
+        x_ext = min(x_end, x_start) - station_length
+
+        # Straight extension from track end
+        x_a = np.linspace(x_end, x_ext, n_straight)
+        y_a = np.full_like(x_a, y_ground)
+        z_a = np.full_like(x_a, z_end)
+
+        # Semicircle in X-Z floor plane
+        z_mid = (z_start + z_end) / 2
+        radius = abs(z_start - z_end) / 2
+
+        theta = np.linspace(-np.pi / 2, np.pi / 2, n_arc)
+
+        # Flip this sign if the curve bends the wrong way
+        bulge_sign = -1
+
+        x_b = x_ext + bulge_sign * radius * np.cos(theta)
+        y_b = np.full_like(x_b, y_ground)
+        z_b = z_mid + radius * np.sin(theta)
+
+        # Straight segment back to station/start
+        x_c = np.linspace(x_ext, x_start, n_straight)
+        y_c = np.full_like(x_c, y_ground)
+        z_c = np.full_like(x_c, z_start)
+
+        Xc = np.concatenate([x_a, x_b, x_c])
+        Yc = np.concatenate([y_a, y_b, y_c])
+        Zc = np.concatenate([z_a, z_b, z_c])
+
+        # Simple connector vectors
+        Fxc = np.diff(Xc, append=Xc[-1])
+        Fyc = np.diff(Yc, append=Yc[-1])
+        Fzc = np.diff(Zc, append=Zc[-1])
+
+        Lxc = np.zeros_like(Xc)
+        Lyc = np.zeros_like(Xc)
+        Lzc = -np.ones_like(Xc)
+
+        Nxc = np.zeros_like(Xc)
+        Nyc = np.ones_like(Xc)
+        Nzc = np.zeros_like(Xc)
+
+        combined_track = (
+            np.concatenate([X, Xc]),
+            np.concatenate([Y, Yc]),
+            np.concatenate([Z, Zc]),
+            np.concatenate([Fx, Fxc]),
+            np.concatenate([Fy, Fyc]),
+            np.concatenate([Fz, Fzc]),
+            np.concatenate([Lx, Lxc]),
+            np.concatenate([Ly, Lyc]),
+            np.concatenate([Lz, Lzc]),
+            np.concatenate([Nx, Nxc]),
+            np.concatenate([Ny, Nyc]),
+            np.concatenate([Nz, Nzc]),
+        )
+
+        return combined_track
 
 
 # ========================== Physics Calculations for Track Design (TODO) ==========================
@@ -997,3 +1071,4 @@ class TrackPhysics:
         if v_bot > v_max:
             return False, v_max
         return True, v_max
+    

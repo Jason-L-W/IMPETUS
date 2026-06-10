@@ -46,8 +46,7 @@ track_function_map = {
 
     # Ends
     "Brake": tracks.TrackPart.brake_func,                   # Using this will result a return to the beginning of the track
-    "Rollup": tracks.TrackPart.rollup_func               # Has no return, but can be used to end the track with a rollup
-
+    "Rollup": tracks.TrackPart.rollup_func                  # Has no return, but can be used to end the track with a rollup
 }
 
 class MainWindow(QMainWindow):
@@ -328,7 +327,7 @@ class MainWindow(QMainWindow):
 
         # Setup the Slider
         length_slider = QSlider(Qt.Orientation.Horizontal)
-        length_slider.setRange(1, 100)
+        length_slider.setRange(0, 100)
         # ======= Test Value =======
         length_slider.setValue(11)
         # ==========================
@@ -508,7 +507,7 @@ class MainWindow(QMainWindow):
 
             ax.axis('off')  # Hide axis elements for a clean image
             ax.set_title(title, fontsize=font_size * 0.5)
-            ax.figure.savefig(filename, dpi=300, bbox_inches='tight', pad_inches=0.1)
+            ax.figure.savefig(f"Images/{filename}", dpi=300, bbox_inches='tight', pad_inches=0.1)
             ax.set_title(title, fontsize=font_size)
             ax.axis('on')   # Restore axis elements for UI display
 
@@ -632,9 +631,10 @@ class MainWindow(QMainWindow):
                     warnings.append(f"• {section_key}: Rollup incline is too tall. Train will stall.")
                     section_passed = False
 
-                # if section_data.get("brake_check") is False:
-                #     warnings.append(f"• {section_key}: Entry speed into exceeds allowed stopping threshold.")
+                if section_data.get("brake_check") is False:
+                    warnings.append(f"• {section_key}: Entry speed into exceeds allowed stopping threshold.")
 
+                # Changes the color of the section, based on whether they passed or failed the checks
                 if section_key in self.single_page_cards:
                     card_widget = self.single_page_cards[section_key]
                     if section_passed:

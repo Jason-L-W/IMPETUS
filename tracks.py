@@ -1,5 +1,6 @@
 import numpy as np
 import read_write_csv as CSV
+import matplotlib.pyplot as plt
 import build
 
 # This class is used to store all track part functions
@@ -29,8 +30,8 @@ class TrackPart:
         Nx, Ny, Nz = track_data[:, 10], track_data[:, 11], track_data[:, 12]
 
         pts = len(track_data)
-        file_name = CSV.write_csv(track_data, pts, scale, track_name)
-        track_content = X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name
+        CSV.write_csv(track_data, pts, scale, track_name)
+        track_content = X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, track_name
         return track_content
 
 
@@ -54,8 +55,9 @@ class TrackPart:
         Lz = X * Fy - Y * Fx
 
         data = np.column_stack((np.arange(1, pts+1), X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz))
-        file_name = CSV.write_csv(data, pts, L, "launcher")
-        track_content = X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name
+        file_name = "launcher"
+        CSV.write_csv(data, pts, L, file_name)
+        track_content = (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name)
         
         # v_exit = sqrt(2aL) where a is the acceleration and L is the length of the track
         v_exit = np.sqrt(2 * 2.5 * 9.8 * L) # Assuming a constant acceleration of 2.5g for the launcher
@@ -77,7 +79,8 @@ class TrackPart:
         Nx, Ny, Nz = lifthill[:, 10], lifthill[:, 11], lifthill[:, 12]
 
         pts = len(lifthill)
-        file_name = CSV.write_csv(lifthill, pts, h, "lifthill")
+        file_name = "lifthill"
+        CSV.write_csv(lifthill, pts, h, file_name)
         track_content = (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name)
         max_y = np.max(Y)
         v_exit = np.sqrt(2 * 9.8 * max_y)
@@ -144,8 +147,9 @@ class TrackPart:
         Lz = X * Fy - Y * Fx
 
         data = np.column_stack((np.arange(1, pts+1), X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz))
-        file_name = CSV.write_csv(data, pts, h, "rollback")
-        track_content = X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name
+        file_name = "rollback"
+        CSV.write_csv(data, pts, h, file_name)
+        track_content = (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name)
         v_exit = np.sqrt(2 * 9.8 * h)
         return track_content, v_exit
 
@@ -168,9 +172,9 @@ class TrackPart:
         Nx, Ny, Nz = camelback[:, 10], camelback[:, 11], camelback[:, 12]
 
         pts = len(camelback)
-        file_name = CSV.write_csv(camelback, pts, h, "camelback")
+        file_name = "camelback"
+        CSV.write_csv(camelback, pts, h, file_name)
         track_content = (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name)
-
         return track_content
 
     # Corkscrew track part (done)
@@ -179,8 +183,10 @@ class TrackPart:
         H = h * 4 # Total height of corkscrew
         r1 = H / 2 # Radius of corkscrew
         B = 1 / (2 * r1)
-        l2 = (3 * np.pi * np.sqrt(H - h)) / 2        
-        l1 = (-3 * h * np.pi / (2*l2) + np.sqrt((3 * h *np.pi / (2 * l2))**2 + 6 * B * h)) / (2 * B)
+
+
+        l2_base = (3 * np.pi * np.sqrt(H - h)) / 2        
+        l1 = (-3 * h * np.pi / (2*l2_base) + np.sqrt((3 * h *np.pi / (2 * l2_base))**2 + 6 * B * h)) / (2 * B)
         A = h/(2*l1**3)-B/l1
 
         # Section 1 (Track before the loop)
@@ -192,7 +198,7 @@ class TrackPart:
         Phi1 = -90 * (0.5 - 0.5 * np.cos(np.pi * t_norm1))
 
         # Section 2 (Track for the loop of corkscrew)
-        l2 = (3 * np.pi / 2) * (H - h)**0.5
+        l2 = l2_base
         t = np.arange(0, 3 * np.pi, 0.01)
         X2 = l2 * t / (3 * np.pi) + X1[-1]
         Y2 = (h / 2) * (1 + np.sin(t)) # Responsible for the loop angle
@@ -279,7 +285,8 @@ class TrackPart:
 
         pts = len(X)
         data = np.column_stack((np.arange(1, pts+1), X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz))
-        file_name = CSV.write_csv(data, pts, r1, "corkscrew")
+        file_name = "corkscrew"
+        CSV.write_csv(data, pts, r1, file_name)
         track_content = (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name)
         return track_content
 
@@ -350,9 +357,9 @@ class TrackPart:
         data = np.zeros((pts, 13))
 
         data = np.column_stack((np.arange(1, len(X) + 1), X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz))
-        file_name = CSV.write_csv(data, pts, r, "loopCG")
+        file_name = "loopCG"
+        CSV.write_csv(data, pts, r, file_name)
         track_content = (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name)
-
         return track_content
 
     # Loop with 2 different radii (TODO - later)
@@ -378,9 +385,9 @@ class TrackPart:
         Nx, Ny, Nz = cobraroll[:, 10], cobraroll[:, 11], cobraroll[:, 12]
 
         pts = len(cobraroll)
-        file_name = CSV.write_csv(cobraroll, pts, h, "cobarollCG")
+        file_name = "cobrarollCG"
+        CSV.write_csv(cobraroll, pts, h, file_name)
         track_content = (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name)
-
         return track_content
 
     # Helix track part (done)
@@ -475,7 +482,8 @@ class TrackPart:
         Lz = X * Fy - Y * Fx
 
         data = np.column_stack((np.arange(1, pts+1), X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz))
-        file_name = CSV.write_csv(data, pts, h, "helix")
+        file_name = "helix"
+        CSV.write_csv(data, pts, h, file_name)
         track_content = X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name
         return track_content
     
@@ -569,7 +577,8 @@ class TrackPart:
         Lz = X * Fy - Y * Fx
 
         data = np.column_stack((np.arange(1, pts+1), X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz))
-        file_name = CSV.write_csv(data, pts, h, "horseshoe")
+        file_name = "horseshoe"
+        CSV.write_csv(data, pts, h, file_name)
         track_content = X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name
         return track_content
 
@@ -598,78 +607,58 @@ class TrackPart:
             Nx, Ny, Nz
             ))
         
-        file_name = CSV.write_csv(data, pts, L, "break")
+        file_name = "break"
+        CSV.write_csv(data, pts, L, file_name)
         track_content = (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name)
         return track_content
 
-    # Rollup track part (TODO - need to fix)
+    # Rollup track part (done)
     @staticmethod
     def rollup_func(h):
         R = (2 / 3) * h
 
-        sin60 = np.sin(np.radians(60))
-        cos60 = np.cos(np.radians(60))
-        tan60 = np.tan(np.radians(60))
+        tan_60 = np.tan(np.radians(60))
+        sin_60 = np.sin(np.radians(60))
 
-        arc_len = R * np.radians(60)
-        line_len = (2 * h) / (3 * sin60)
+        end_X1 = R * sin_60
+
+        X1 = np.arange(0, end_X1, 1)
+        Y1 = R - np.sqrt(R**2 - X1**2)
+        Y1_end = R - np.sqrt(R**2 - end_X1**2)
+
+        end_X2 = (2 * h) / (3 * tan_60) + end_X1
+        X2 = np.arange(end_X1, end_X2, 1)
+        Y2 = Y1_end + tan_60 * (X2 - end_X1)
         
-        # Estimate point counts to maintain roughly a 1-unit spacing smoothly
-        pts1 = max(2, int(np.round(arc_len)))
-        pts2 = max(2, int(np.round(line_len)))
-
-        # Segment 1: Circular Arc
-        theta1 = np.linspace(0, np.radians(60), pts1, endpoint=False)
-        X1 = R * np.sin(theta1)
-        Y1 = R * (1 - np.cos(theta1))
-
-        # Segment 2: Straight Line
-        x2_start = R * sin60
-        x2_end = (2 * h) / (3 * tan60) + x2_start
-        X2 = np.linspace(x2_start, x2_end, pts2)
-        Y2 = h / 3 + tan60 * (X2 - x2_start)
-
         X = np.concatenate([X1, X2])
         Y = np.concatenate([Y1, Y2])
-        Z = np.zeros(len(X))
         pts = len(X)
 
-        # Segment 1 Unit Vectors (Arc)
-        Fx1 = np.cos(theta1)
-        Fy1 = np.sin(theta1)
-        Fz1 = np.zeros(pts1)
+        Z = np.zeros(pts)
 
-        Nx1 = -np.sin(theta1)
-        Ny1 = np.cos(theta1)
-        Nz1 = np.zeros(pts1)
+        Nx, Ny, Nz = np.zeros(pts), np.zeros(pts), np.zeros(pts)
+        dx, dy = np.diff(X), np.diff(Y)
 
-        # Segment 2 Unit Vectors (Line)
-        Fx2 = np.full(pts2, cos60)
-        Fy2 = np.full(pts2, sin60)
-        Fz2 = np.zeros(pts2)
+        hyp = np.sqrt(dx**2 + dy**2)
+        hyp = np.where(hyp == 0, 1, hyp)  # Prevent division by zero
 
-        Nx2 = np.full(pts2, -sin60)
-        Ny2 = np.full(pts2, cos60)
-        Nz2 = np.zeros(pts2)
+        tx = dx / hyp
+        ty = dy / hyp
 
-        # Combine Forward (Tangent) and Up (Normal) vectors
-        Fx = np.concatenate([Fx1, Fx2])
-        Fy = np.concatenate([Fy1, Fy2])
-        Fz = np.concatenate([Fz1, Fz2])
+        Nx[:-1], Ny[:-1] = -ty, tx
+        Nx[-1], Ny[-1] = Nx[-2], Ny[-2]
+        
+        Fx, Fy, Fz = np.ones(pts), np.ones(pts), np.ones(pts)
+        Fx[:-1], Fy[:-1], Fz[:-1] = np.diff(X), np.diff(Y), np.diff(Z)
+        Fx[-1], Fy[-1], Fz[-1] = Fx[-2], Fy[-2], Fz[-2]
 
-        Nx = np.concatenate([Nx1, Ny2])  # Wait, let's keep array mapping matching
-        Nx = np.concatenate([Nx1, Nx2])
-        Ny = np.concatenate([Ny1, Ny2])
-        Nz = np.concatenate([Nz1, Nz2])
-
-        # Left Vector (Binormal)
-        # For a flat 2D track lying on the XY-plane, the Left vector always points straight up along Z
-        Lx = np.zeros(pts)
-        Ly = np.zeros(pts)
-        Lz = np.ones(pts)
+        Lx = Y * Fz - Z * Fy
+        Ly = Z * Fx - X * Fz
+        Lz = X * Fy - Y * Fx
 
         data = np.column_stack((np.arange(1, pts + 1), X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz))
-        file_name = CSV.write_csv(data, pts, h, "rollup")
+        file_name = "rollup"
+        CSV.write_csv(data, pts, h, file_name)
         track_content = (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name)
         return track_content
 
@@ -680,7 +669,7 @@ class TrackPart:
     # =======================================================================
     # Combine multiple track parts into one (Done)
     @staticmethod
-    def combine_tracks(*parts):
+    def combine_tracks(*parts, coaster_name):
         # Parts include the following:
         # "section": the section of the track part (Starts, Thrills 1, Turns, Thrills 2, Ends)
         # "type": the type of the track part
@@ -714,7 +703,6 @@ class TrackPart:
         # === Combine the tracks together ===
         # Inital track (Starting Track)
         X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz = [arr.ravel().astype(float) for arr in parts[0]["arrays"][:12]]
-
         # Get the velocity exiting from the starting track
         v_exit = parts[0]["v_exit"]
 
@@ -730,7 +718,7 @@ class TrackPart:
             part_velocities = TrackPhysics.calculate_velocity(v_exit, Y2)
             velocity_n_radius[section_key]["velocities"] = part_velocities
 
-            passed, fail_index = TrackPhysics.velocity_check(part_velocities)
+            passed, _ = TrackPhysics.velocity_check(part_velocities)
             if passed:
                 checks[section_key]["velocity_check"] = True
                 v_exit = part_velocities[-1]
@@ -748,12 +736,12 @@ class TrackPart:
 
             # === After finding the V's and R's we do the checks ===
             # Valley Checks
-            if section_type in ("Loop", "Camelback", "Corkscrew", "Cobral Roll", "test"):
+            if section_type in ("Loop", "Camelback", "Corkscrew", "Cobra Roll"):
                 val_passed, _ = TrackPhysics.valley_check(v_bot, r_bot)
                 checks[section_key]["valley_check"] = val_passed
 
             # Inversion Checks
-            if section_type in ("Loop", "Corkscrew", "Cobral Roll", "test"):
+            if section_type in ("Loop", "Corkscrew", "Cobra Roll"):
                 inv_passed, _ = TrackPhysics.inversion_check(v_top, r_top)
                 checks[section_key]["inversion_check"] = inv_passed
 
@@ -783,7 +771,6 @@ class TrackPart:
                 track_L = np.sum(np.sqrt(np.diff(X2)**2 + np.diff(Y2)**2 + np.diff(Z2)**2))                
                 brake_passed, _ = TrackPhysics.brake_check(v_bot, track_L)
                 checks[section_key]["brake_check"] = brake_passed
-            
 
             # === After Turns Section Invert Track ===
             if section_key in ("Thrills 2", "Ends"):
@@ -792,6 +779,12 @@ class TrackPart:
                 Fx2, Fy2, Fz2 = -Fx2[::-1], -Fy2[::-1], -Fz2[::-1]
                 Lx2, Ly2, Lz2 = -Lx2[::-1], -Ly2[::-1], -Lz2[::-1]
                 Nx2, Ny2, Nz2 = Nx2[::-1], Ny2[::-1], Nz2[::-1]
+
+                if section_type == "Rollup":
+                    plt.figure()
+                    plt.plot(X2, Y2, 'b-', label='Track Path')
+                    plt.plot(X2 + Nx2, Y2 + Ny2, 'r-', alpha=0.4, label='Normals')
+                    plt.show()
 
             # Offset the new part to connect smoothly
             X2 += X[-1] - X2[0]
@@ -820,7 +813,7 @@ class TrackPart:
         # === Combine all the data into a single array and write to CSV ===
         pts = len(X)
         data = np.column_stack((np.arange(1, pts+1), X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz))
-        file_name = CSV.csv_noLimits_format(data, pts, 0, "combined_track")
+        CSV.csv_noLimits_format(data, pts, 0, f"Complete_Coaster/{coaster_name}")
 
         # === Data for SolidWorks ===
         # Clean up the data so that its viable to be used by SolidWorks for 3D printing
@@ -832,7 +825,7 @@ class TrackPart:
     
 
         # === Calculates the xy VS z composition of the track ===
-        xy_composition = []
+        xyz_composition = []
         current_idx = 0
         for part in parts:
             part_section = part["section"]
@@ -845,11 +838,15 @@ class TrackPart:
             seg_Z = Y[current_idx:end_idx]
             seg_Y = Z[current_idx:end_idx]
 
+            dx = np.diff(seg_X, prepend=seg_X[0])
+            dy = np.diff(seg_Y, prepend=seg_Y[0])
+            dz = np.diff(seg_Z, prepend=seg_Z[0])
+
             if part_type != "Loop":
-                dx = np.diff(seg_X, prepend=seg_X[0])
-                dy = np.diff(seg_Y, prepend=seg_Y[0])
-                distances = np.sqrt(dx**2 + dy**2)
-                part_XY = np.cumsum(distances)
+                distances_XY = np.sqrt(dx**2 + dy**2)
+                distances_YZ = np.sqrt(dy**2 + dz**2)
+                part_XY = np.cumsum(distances_XY)
+                part_YZ = np.cumsum(distances_YZ)
             else:
                 heading_x = seg_X[-1] - seg_X[0]
                 heading_y = seg_Y[-1] - seg_Y[0]
@@ -861,18 +858,19 @@ class TrackPart:
                 else:
                     part_XY = seg_X - seg_X[0]
 
-            xy_composition.append({
+            xyz_composition.append({
                 "section": part_section,
                 "type": part_type,
                 "XY": part_XY,
+                "YZ": part_YZ,
                 "Z": seg_Z
             })
 
             current_idx = end_idx
 
         # Create a dictionary to store the combined track data and the XY composition of each track part
-        combined_track = (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name)
-        return combined_track, xy_composition, velocity_n_radius, checks
+        combined_track = (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, coaster_name)
+        return combined_track, xyz_composition, velocity_n_radius, checks
     
     # =======================================================================
     #           Loops the end back to the beginning of the track
@@ -1072,3 +1070,11 @@ class TrackPhysics:
             return False, v_max
         return True, v_max
     
+
+if __name__ == "__main__":
+    (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name), v_exit = TrackPart.rollback_func(11)
+    
+    plt.figure()
+    plt.plot(X, Y, 'b-', label='Track Path')
+    plt.plot(X + Nx, Y + Ny, 'r-', alpha=0.4, label='Normals')
+    plt.show()

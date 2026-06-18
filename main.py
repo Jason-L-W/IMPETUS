@@ -1,6 +1,7 @@
 import tracks
 import read_write_csv as CSV
 import build
+import numpy as np
 
 def main():
     """
@@ -27,12 +28,15 @@ def main():
     # build.plot(combined_track)
 
     # Test combining multiple track parts
-    part1 = tracks.TrackPart.lifthill_func(11.0)
-    part2 = tracks.TrackPart.loopCG_func(11.0)
-    part3 = tracks.TrackPart.cobrarollCG_func(11.0)
+    # part1 = tracks.TrackPart.lifthill_func(11.0)
+    # part2 = tracks.TrackPart.loopCG_func(11.0)
+    # part3 = tracks.TrackPart.cobrarollCG_func(11.0)
 
-    combined, xy_composition = tracks.TrackPart.combine_tracks(part1, part2, part3)
-    build.plot(combined)
+    # combined, xy_composition = tracks.TrackPart.combine_tracks(part1, part2, part3)
+    # build.plot(combined)
+
+    print(np.tan(np.radians(60)))
+    print(np.tan(np.deg2rad(60)))
 
 
     

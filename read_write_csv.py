@@ -65,7 +65,7 @@ def write_csv(data, pts, prop, elementname):
         writer.writerow(header)
         writer.writerows(data)
 
-    return file_name
+    return None
 
 
 # ========================================================================
@@ -120,4 +120,4 @@ def csv_noLimits_format(data, pts, prop, elementname):
             f.write("\t".join(line_items) + "\n")
 
     print(f"file {file_name} created successfully")
-    return file_name
+    return None

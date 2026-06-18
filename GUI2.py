@@ -509,7 +509,6 @@ class MainWindow(QMainWindow):
         # === 2D View ===
         x_min_top, x_max_top = np.min(X), np.max(X)
         z_min_top, z_max_top = np.min(Z), np.max(Z)
-        
         top_view_x_span = x_max_top - x_min_top
         top_view_y_span = z_max_top - z_min_top
 
@@ -521,6 +520,8 @@ class MainWindow(QMainWindow):
             "sec_4": "red",
             "sec_5": "blue"
         }
+
+
 
         # Calculate tracking properties
         total_track_length = 0
@@ -574,14 +575,33 @@ class MainWindow(QMainWindow):
             elif idx in (3, 4):
                 self.track_plots["section_45"]["ax"].plot(global_2d_horizontal, Z_elevation)
 
-            # --- Fill Combined Subplots concurrently ---
-            # Row 0: Top View Segment-by-Segment coloring
+
             segment_len = len(local_horizontal)
             array_idx_end = array_idx_start + segment_len
             segment_X = X[array_idx_start:array_idx_end]
             segment_Z = Z[array_idx_start:array_idx_end]
             
             axes[0].plot(segment_X, segment_Z, color=segment_color, linewidth=2)
+            
+            
+            if idx < len(xy_composition) - 1:
+                # The last index of the current segment data block
+                transition_idx = array_idx_end - 1
+                
+                # 1. Plot dot on the standalone UI top view
+                self.track_plots["whole_track_topview"]["ax"].plot(
+                    X[transition_idx], Z[transition_idx], 
+                    color='black', marker='o', markersize=6, zorder=5
+                )
+                
+                # 2. Plot dot on the combined figure's top view (row 0)
+                axes[0].plot(
+                    X[transition_idx], Z[transition_idx], 
+                    color='black', marker='o', markersize=6, zorder=5
+                )
+
+            
+            
             array_idx_start = array_idx_end - 1  # Continuous connection pointer
 
             # Rows 1-3: Process Segment-by-Segment zero-aligned views
@@ -641,7 +661,7 @@ class MainWindow(QMainWindow):
             ax.set_title(title, fontsize=font_size)
             canvas.draw()
                 
-            filename = f"{title.lower().replace(' ', '_')}.png"
+            filename = f"{title.lower().replace(' ', '_')}.svg"
             temp_elements = []
 
             # Diagram markers injection unique to individual whole sideview file
@@ -731,26 +751,37 @@ class MainWindow(QMainWindow):
                     linewidth=line.get_linewidth()
                 )
 
+            
+            if plot_type == "top":
+                dot_array_idx = 0
+                for idx, segment in enumerate(xy_composition[:-1]):  # Stop before last segment
+                    dot_array_idx += len(segment["XY"]) - 1
+                    single_ax.plot(
+                        X[dot_array_idx], Z[dot_array_idx], 
+                        color='black', marker='o', markersize=6, zorder=5
+                    )
+
+
+            current_xlim = ax.get_xlim()
+            current_ylim = ax.get_ylim()
+
+            track_x_data = []
+            track_y_data = []
+
+            for line in ax.get_lines():
+                track_x_data.extend(line.get_xdata())
+                track_y_data.extend(line.get_ydata())
+
+            track_x_data = np.array(track_x_data, dtype=float)
+            track_y_data = np.array(track_y_data, dtype=float)
+
             if plot_type != "top":
-                current_xlim = ax.get_xlim()
-                current_ylim = ax.get_ylim()
-
-                track_x_data = []
-                track_y_data = []
-                for line in ax.get_lines():
-                    track_x_data.extend(line.get_xdata())
-                    track_y_data.extend(line.get_ydata())
-
-                track_x_data = np.array(track_x_data, dtype=float)
-                track_y_data = np.array(track_y_data, dtype=float)
-
-
                 box_physical_width_inches = 22.0
                 box_data_width = float(current_xlim[1] - current_xlim[0])
                 one_inch_in_data_units = box_data_width / box_physical_width_inches
                 
                 step_size = 0.5 * one_inch_in_data_units  
-                tooth_height = one_inch_in_data_units
+                tooth_height = 0.5 * one_inch_in_data_units
 
                 lowest_track_point = float(np.min(track_y_data)) if len(track_y_data) > 0 else 0.0
                 y_baseline = lowest_track_point - (one_inch_in_data_units * 2.0)
@@ -765,10 +796,8 @@ class MainWindow(QMainWindow):
                     return lowest_track_point
 
 
-                
                 if len(track_x_data) > 0:
                     t_min_x, t_max_x = min(track_x_data), max(track_x_data)
-
 
                     span_width = t_max_x - t_min_x
                     num_cycles = int(span_width / (step_size * 2)) + 1
@@ -776,7 +805,6 @@ class MainWindow(QMainWindow):
                     x_pattern = []
                     y_pattern = []
                     
-                    # CRITICAL FIX: Start the pattern right at the left track boundary
                     current_x = t_min_x
 
                     x_pattern.append(current_x)
@@ -807,11 +835,6 @@ class MainWindow(QMainWindow):
                         x_pattern.append(current_x)
                         y_pattern.append(tooth_top)
 
-                    # Close pattern path cleanly exactly at the right track boundary
-                    # if current_x < t_max_x:
-                    #     x_pattern.append(t_max_x)
-                    #     y_pattern.append(y_baseline)
-
 
                     single_ax.plot(
                         np.array(x_pattern, dtype=float), 
@@ -822,18 +845,8 @@ class MainWindow(QMainWindow):
                         zorder=1
                     )
                 
-                    # Example 1: Add a solid reference baseline at y=0 (or y_base)
-                    # This gives your Cricut a solid ground plate path to cut out
-                    # single_ax.plot(
-                    #     [t_min_x, t_max_x], 
-                    #     [y_baseline, y_baseline],                        
-                    #     color='black', 
-                    #     linewidth=1.5, 
-                    #     linestyle='-'
-                    # )
-
-                    single_ax.plot([t_min_x, t_min_x], [0, y_baseline], color='red', linewidth=1.5)
-                    single_ax.plot([t_max_x, t_max_x], [0, y_baseline], color='red', linewidth=1.5)
+                    single_ax.plot([t_min_x, t_min_x], [5, y_baseline], color='black', linewidth=1.5)
+                    single_ax.plot([t_max_x, t_max_x], [5, y_baseline], color='black', linewidth=1.5)
 
                 # Push the viewport limit slightly below the new 2-inch floor layout to keep it visible
                 expanded_ymin = y_baseline - (one_inch_in_data_units * 0.5)
@@ -842,9 +855,27 @@ class MainWindow(QMainWindow):
                 single_ax.set_ylim(ax.get_ylim())
 
         
-            # 4. Apply matching limits, aspect ratios, and kill the bounding boxes
-            single_ax.set_xlim(ax.get_xlim())
-            # single_ax.set_ylim(ax.get_ylim())
+            if len(track_x_data) > 0:
+                data_min_x = np.min(track_x_data)
+                data_max_x = np.max(track_x_data)
+                
+                # If it's a section view with foundation teeth, expand the data bounds to include them
+                if plot_type != "top":
+                    data_min_x = min(data_min_x, min(x_pattern))
+                    data_max_x = max(data_max_x, max(x_pattern))
+
+                # Calculate the exact center of the section data
+                data_mid_x = (data_min_x + data_max_x) / 2.0
+                
+                # Keep the total window width uniform across all SVGs 
+                total_window_width = current_xlim[1] - current_xlim[0]
+                half_width = total_window_width / 2.0
+                
+                # Center the uniform layout window over the data midpoint
+                single_ax.set_xlim(data_mid_x - half_width, data_mid_x + half_width)
+            else:
+                single_ax.set_xlim(ax.get_xlim())
+            
             single_ax.set_aspect('equal', adjustable='box')
             single_ax.axis('off')
             
@@ -874,7 +905,7 @@ class MainWindow(QMainWindow):
             top=top_fraction,
         )
 
-        fig.savefig("Images/combined_track_views.png", dpi=300)
+        fig.savefig("Images/combined_track_views.svg", dpi=300)
         plt.close(fig)
 
 

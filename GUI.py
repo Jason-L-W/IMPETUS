@@ -229,8 +229,8 @@ class MainWindow(QMainWindow):
         self.setup_selector = QComboBox()
         self.setup_selector.addItems(["Setup 1: All on 1 Page", "Setup 2: Tabbed View"])
         self.setup_selector.setStyleSheet("""
-            QComboBox { background-color: white; color: #2c3e50; padding: 6px; border-radius: 5px; font-weight: bold; }
-            QComboBox QAbstractItemView { background-color: white; border-radius: 5px; font-weight: bold; }
+            QComboBox { background-color: white; color: #2c3e50; padding: 6px; border-radius: 5px; font-size: 12px; font-weight: bold; }
+            QComboBox QAbstractItemView { background-color: white; border-radius: 5px; font-size: 12px; font-weight: bold; }
                                           """)
         selector_layout.addWidget(selector_label)
         selector_layout.addWidget(self.setup_selector)
@@ -259,10 +259,7 @@ class MainWindow(QMainWindow):
 
         # Visual Label
         visual_label = QLabel("Track Visualization")
-        visual_label.setStyleSheet(
-            "color: blue; font-size: 20px; background-color: white;"
-            "padding: 5px; border-radius: 5px;"
-        )
+        visual_label.setStyleSheet("color: blue; font-size: 20px; background-color: white; padding: 5px; border-radius: 5px;")
         visual_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         visual_label.setFixedHeight(40)
         visual_layout.addWidget(visual_label)
@@ -462,7 +459,7 @@ class MainWindow(QMainWindow):
         
         # Setup the Length Input Field
         length_input = QLineEdit()
-        length_input.setPlaceholderText("Track Length")
+        length_input.setPlaceholderText("Track Length (Meters)")
         # ======= Test Value =======
         length_input.setText("11")
         # ==========================
@@ -647,7 +644,6 @@ class MainWindow(QMainWindow):
             "sec_4": "red",
             "sec_5": "blue"
         }
-
 
 
         # Calculate tracking properties
@@ -887,7 +883,6 @@ class MainWindow(QMainWindow):
                         X[dot_array_idx], Z[dot_array_idx], 
                         color='black', marker='o', markersize=6, zorder=5
                     )
-
 
             current_xlim = ax.get_xlim()
             current_ylim = ax.get_ylim()

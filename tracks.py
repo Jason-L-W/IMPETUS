@@ -772,6 +772,9 @@ class TrackPart:
                 nx, ny, nz = Nx2[peak_idx], Ny2[peak_idx], Nz2[peak_idx]
                 mag = np.sqrt(nx**2 + ny**2 + nz**2)
                 theta_rad = np.arccos(nz / mag) if mag > 1e-5 else 0.0
+                
+                # x_max = np.max(X2)
+                # print(x_max)
 
                 lat_passed, _ = TrackPhysics.lateral_check(v_top, r_top, theta_rad)
                 checks[section_name]["lateral_check"] = lat_passed
@@ -1097,7 +1100,7 @@ class TrackPhysics:
     def brake_check(v_bot, L):
         # v_max = sqrt(2 * a * L), check if v_bot < v_max
         a_decel = 1.5
-        v_max = np.sqrt(2 * a_decel * L)
+        v_max = np.sqrt(2 * a_decel * TrackPhysics.g * L)
 
         print(f"v_bot: {v_bot}\n")
         print(f"L: {L} v_max: {v_max}\n")

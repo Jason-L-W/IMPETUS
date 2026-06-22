@@ -1,7 +1,6 @@
 import numpy as np
 import read_write_csv as CSV
 import matplotlib.pyplot as plt
-import build
 
 # This class is used to store all track part functions
 # For all tracks, friction is negligible.
@@ -153,6 +152,7 @@ class TrackPart:
         v_exit = np.sqrt(2 * 9.8 * h)
         return track_content, v_exit
 
+
     # ========================================================================
     #                               Thrill Tracks
     # ========================================================================
@@ -290,7 +290,6 @@ class TrackPart:
         track_content = (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name)
         return track_content
 
-    # ========================== Loop with constant G-force (possibly need to fix) ==========================
     # Loop with constant G-force (done)
     # This also needs to return the height, r1, and r2 of the loop
     @staticmethod
@@ -678,18 +677,23 @@ class TrackPart:
         if not parts:
             return None
         
-        velocity_n_radius = {}
+        track_stats = {}
         checks = {}
-        # Starting track is NOT included!!!
-        for part in parts:
-            section_key = part["section"]
 
-            velocity_n_radius[section_key] = {
+        for part in parts:
+            section_name = part["section"]
+
+            track_stats[section_name] = {
+                "velocity_exit": None,      # Exiting velocity
                 "velocities": None,         # Array of velocities at each point
+                "v_top": None,
+                "v_bottom": None,
                 "radius": None,             # Array of radius at each point
+                "r_top": None,
+                "r_bottom": None
             }
 
-            checks[section_key] = {
+            checks[section_name] = {
                 # Initially it doesn't pass any checks
                 "velocity_check": False,
                 "valley_check": None,
@@ -704,11 +708,14 @@ class TrackPart:
         # Inital track (Starting Track)
         X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz = [arr.ravel().astype(float) for arr in parts[0]["arrays"][:12]]
         # Get the velocity exiting from the starting track
+        start_section = parts[0]["section"]
         v_exit = parts[0]["v_exit"]
+        track_stats[start_section]["velocity_exit"] = v_exit
+        print(f"start velocity: {v_exit}\n")
 
         # Goes through Thrills 1, Turns, Thrill 2, and Ends
         for part in parts[1:]:
-            section_key = part["section"]
+            section_name = part["section"]
             section_type = part["type"]
 
             # Get the next parts data
@@ -716,64 +723,73 @@ class TrackPart:
 
             # === Calculating the velocities for each section ===
             part_velocities = TrackPhysics.calculate_velocity(v_exit, Y2)
-            velocity_n_radius[section_key]["velocities"] = part_velocities
+            track_stats[section_name]["velocities"] = part_velocities
 
             passed, _ = TrackPhysics.velocity_check(part_velocities)
             if passed:
-                checks[section_key]["velocity_check"] = True
+                checks[section_name]["velocity_check"] = True
                 v_exit = part_velocities[-1]
             else:
+                checks[section_name]["velocity_check"] = False
                 v_exit = 0.0 # Coaster stopped tracking forward
+
+            track_stats[section_name]["velocity_exit"] = v_exit
 
             # === Calculating the R for each section ===
             # Technically it only needs to calculate the radius for Thrills and Turns
             part_radius = TrackPhysics.calculate_R(xyz_component=(X2,Y2,Z2), forward_component=(Fx2,Fy2,Fz2))
-            velocity_n_radius[section_key]["radius"] = part_radius
+            track_stats[section_name]["radius"] = part_radius
 
             peak_idx = np.argmax(Y2)
+
             v_bot, v_top = part_velocities[0], part_velocities[peak_idx]
+            track_stats[section_name]["v_bottom"] = v_bot
+            track_stats[section_name]["v_top"] = v_top
+
             r_bot, r_top = part_radius[0], part_radius[peak_idx]
+            track_stats[section_name]["r_bottom"] = r_bot
+            track_stats[section_name]["r_top"] = r_top
 
             # === After finding the V's and R's we do the checks ===
             # Valley Checks
             if section_type in ("Loop", "Camelback", "Corkscrew", "Cobra Roll"):
                 val_passed, _ = TrackPhysics.valley_check(v_bot, r_bot)
-                checks[section_key]["valley_check"] = val_passed
+                checks[section_name]["valley_check"] = val_passed
 
             # Inversion Checks
             if section_type in ("Loop", "Corkscrew", "Cobra Roll"):
                 inv_passed, _ = TrackPhysics.inversion_check(v_top, r_top)
-                checks[section_key]["inversion_check"] = inv_passed
+                checks[section_name]["inversion_check"] = inv_passed
 
             # Peak Checks
             elif section_type == "Camelback":
                 peak_passed, _ = TrackPhysics.peak_check(v_top, r_top)
-                checks[section_key]["peak_check"] = peak_passed
+                checks[section_name]["peak_check"] = peak_passed
 
             # Lateral Checks
-            elif section_type in ("Horseshoe", "Helix") or section_key.startswith("Turns"):
+            elif section_type in ("Horseshoe", "Helix"):
                 # Extract normal tracking banking profile vector components at peak apex
                 nx, ny, nz = Nx2[peak_idx], Ny2[peak_idx], Nz2[peak_idx]
                 mag = np.sqrt(nx**2 + ny**2 + nz**2)
                 theta_rad = np.arccos(nz / mag) if mag > 1e-5 else 0.0
 
                 lat_passed, _ = TrackPhysics.lateral_check(v_top, r_top, theta_rad)
-                checks[section_key]["lateral_check"] = lat_passed
+                checks[section_name]["lateral_check"] = lat_passed
 
             # Ends Check
             elif section_type == "Rollup":
                 total_h = np.max(Y2) - Y2[0]
                 roll_passed, _ = TrackPhysics.rollup_check(v_bot, total_h)
-                checks[section_key]["rollup_check"] = roll_passed
+                checks[section_name]["rollup_check"] = roll_passed
 
             elif section_type == "Brake":
                 # Fallbacks if track array metrics don't pass configuration lengths
                 track_L = np.sum(np.sqrt(np.diff(X2)**2 + np.diff(Y2)**2 + np.diff(Z2)**2))                
                 brake_passed, _ = TrackPhysics.brake_check(v_bot, track_L)
-                checks[section_key]["brake_check"] = brake_passed
+                checks[section_name]["brake_check"] = brake_passed
 
             # === After Turns Section Invert Track ===
-            if section_key in ("Thrills 2", "Ends"):
+            if section_name in ("Thrills 2", "Ends"):
                 # If the part is a "Thrills 2" or "Ends" section, reverse the order of the arrays to ensure smooth connection
                 X2, Y2, Z2 = X2[::-1], Y2, Z2[::-1]
                 Fx2, Fy2, Fz2 = -Fx2[::-1], -Fy2[::-1], -Fz2[::-1]
@@ -817,60 +833,20 @@ class TrackPart:
 
         # === Data for SolidWorks ===
         # Clean up the data so that its viable to be used by SolidWorks for 3D printing
-        sw_data = np.column_stack((X, Y, Z))
-        matrix_diff = np.diff(sw_data, axis=0)
-        is_different = np.any(np.abs(matrix_diff) > 1e-5, axis=1)
-        cleaned_sw_data = np.vstack([sw_data[0], sw_data[1:][is_different]])
-        np.savetxt("to_solidwork.txt", cleaned_sw_data, fmt="%e", delimiter="\t")
+        # sw_data = np.column_stack((X, Y, Z))
+        # matrix_diff = np.diff(sw_data, axis=0)
+        # is_different = np.any(np.abs(matrix_diff) > 1e-5, axis=1)
+        # cleaned_sw_data = np.vstack([sw_data[0], sw_data[1:][is_different]])
+        # np.savetxt("to_solidwork.txt", cleaned_sw_data, fmt="%e", delimiter="\t")
     
 
         # === Calculates the xy VS z composition of the track ===
-        xyz_composition = []
-        current_idx = 0
-        for part in parts:
-            part_section = part["section"]
-            part_type = part["type"]
-
-            seg_len = part["arrays"][0].size
-            end_idx = current_idx + seg_len
-            
-            seg_X = X[current_idx:end_idx]
-            seg_Z = Y[current_idx:end_idx]
-            seg_Y = Z[current_idx:end_idx]
-
-            dx = np.diff(seg_X, prepend=seg_X[0])
-            dy = np.diff(seg_Y, prepend=seg_Y[0])
-            dz = np.diff(seg_Z, prepend=seg_Z[0])
-
-            if part_type != "Loop":
-                distances_XY = np.sqrt(dx**2 + dy**2)
-                distances_YZ = np.sqrt(dy**2 + dz**2)
-                part_XY = np.cumsum(distances_XY)
-                part_YZ = np.cumsum(distances_YZ)
-            else:
-                heading_x = seg_X[-1] - seg_X[0]
-                heading_y = seg_Y[-1] - seg_Y[0]
-                heading_length = np.sqrt(heading_x**2 + heading_y**2)
-                if heading_length > 1e-5:
-                    ux = heading_x / heading_length
-                    uy = heading_y / heading_length
-                    part_XY = (seg_X - seg_X[0]) * ux + (seg_Y - seg_Y[0]) * uy
-                else:
-                    part_XY = seg_X - seg_X[0]
-
-            xyz_composition.append({
-                "section": part_section,
-                "type": part_type,
-                "XY": part_XY,
-                "YZ": part_YZ,
-                "Z": seg_Z
-            })
-
-            current_idx = end_idx
+        xyz_composition = TrackPart.calculating_xyz_composition(X, Y, Z, *parts)
+        
 
         # Create a dictionary to store the combined track data and the XY composition of each track part
         combined_track = (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, coaster_name)
-        return combined_track, xyz_composition, velocity_n_radius, checks
+        return combined_track, xyz_composition, track_stats, checks
     
     # =======================================================================
     #           Loops the end back to the beginning of the track
@@ -951,6 +927,64 @@ class TrackPart:
         return combined_track
 
 
+    # =======================================================================
+    #               Calculating the velocity and radius
+    # =======================================================================
+    
+
+
+
+    # =======================================================================
+    #           Calculating the xyz composition for visual's
+    # =======================================================================
+    @staticmethod
+    def calculating_xyz_composition(X, Y, Z, *parts):
+        xyz_composition = []
+        current_idx = 0
+        for part in parts:
+            part_section = part["section"]
+            part_type = part["type"]
+
+            seg_len = part["arrays"][0].size
+            end_idx = current_idx + seg_len
+            
+            seg_X = X[current_idx:end_idx]
+            seg_Z = Y[current_idx:end_idx]
+            seg_Y = Z[current_idx:end_idx]
+
+            dx = np.diff(seg_X, prepend=seg_X[0])
+            dy = np.diff(seg_Y, prepend=seg_Y[0])
+            dz = np.diff(seg_Z, prepend=seg_Z[0])
+
+            if part_type != "Loop":
+                distances_XY = np.sqrt(dx**2 + dy**2)
+                distances_YZ = np.sqrt(dy**2 + dz**2)
+                part_XY = np.cumsum(distances_XY)
+                part_YZ = np.cumsum(distances_YZ)
+            else:
+                heading_x = seg_X[-1] - seg_X[0]
+                heading_y = seg_Y[-1] - seg_Y[0]
+                heading_length = np.sqrt(heading_x**2 + heading_y**2)
+                if heading_length > 1e-5:
+                    ux = heading_x / heading_length
+                    uy = heading_y / heading_length
+                    part_XY = (seg_X - seg_X[0]) * ux + (seg_Y - seg_Y[0]) * uy
+                else:
+                    part_XY = seg_X - seg_X[0]
+
+            xyz_composition.append({
+                "section": part_section,
+                "type": part_type,
+                "XY": part_XY,
+                "YZ": part_YZ,
+                "Z": seg_Z
+            })
+
+            current_idx = end_idx
+
+            return xyz_composition
+
+
 # ========================== Physics Calculations for Track Design (TODO) ==========================
 class TrackPhysics:
     g = 9.8
@@ -1007,7 +1041,6 @@ class TrackPhysics:
         if np.isnan(velocity_array).any():
             first_fail_idx = np.where(np.isnan(velocity_array))[0][0]
             return False, first_fail_idx
-        
         return True, None
 
     @staticmethod
@@ -1061,11 +1094,14 @@ class TrackPhysics:
         return True, max_possible_h
     
     @staticmethod
-    # This will need to be tweek later on since it will need loop arounds
     def brake_check(v_bot, L):
         # v_max = sqrt(2 * a * L), check if v_bot < v_max
-        a_decel = 2
+        a_decel = 1.5
         v_max = np.sqrt(2 * a_decel * L)
+
+        print(f"v_bot: {v_bot}\n")
+        print(f"L: {L} v_max: {v_max}\n")
+
         if v_bot > v_max:
             return False, v_max
         return True, v_max

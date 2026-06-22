@@ -23,7 +23,7 @@ from recommendation import EnergyRecommendation
 SECTIONS = ["Starts", "Thrills 1", "Turns", "Thrills 2", "Ends"]    # Defines the sections of the track assembly
 STARTS = ["Launcher", "Lift Hill", "Rollback"]                      # Defines the starting track types
 THRILLS = ["Loop", "Camelback", "Corkscrew"]                        # Defines the thrill track types
-TURNS = ["Cobra Roll", "Horseshoe", "Helix"]                       # Defines the turn track types
+TURNS = ["Cobra Roll", "Horseshoe", "Helix"]                        # Defines the turn track types
 ENDS = ["Brake", "Rollup"]                                          # Defines the ending track types
 ALL_TRACKS = STARTS + THRILLS + TURNS + ENDS                        # Defines all track types for validation
 # ========================================================================
@@ -53,6 +53,40 @@ track_function_map = {
 
 
 # Custom Dialog Box
+class StatsDialog(QDialog):
+    def __init__(self, section_name, stats_data, parent=None):
+        super().__init__(parent)
+
+        self.setWindowTitle(f"Statisitcs - {section_name}")
+        self.resize(300, 200)
+        self.setStyleSheet("""
+            QDialog { background-color: #f8f9fa; }
+            QLabel { font-size: 12px; color: #2c3e50; }
+                           """)
+        
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(15, 15, 15, 15)
+        main_layout.setSpacing(15)
+
+        header_label = QLabel(f"Stats Overview for {section_name}")
+        header_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #2980b9;")
+        main_layout.addWidget(header_label)
+
+        form_layout = QFormLayout()
+        form_layout.setSpacing(8)
+
+        for key, value in stats_data.items():
+            key_label = QLabel(f"<b>{key}:</b>")
+            val_label = QLabel(str(value))
+            form_layout.addRow(key_label, val_label)
+
+        main_layout.addLayout(form_layout)
+
+        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        button_box.rejected.connect(self.reject)
+        main_layout.addWidget(button_box)
+
+
 class DualInputDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -169,6 +203,9 @@ class MainWindow(QMainWindow):
             self.track_type(section)
         self.switch_view_mode(0)
 
+        # Initialize stats
+        self.track_stats = {}
+        self.checks = {}
 
     # ========================================================================
     #                       Assembly Panels and Controls
@@ -243,7 +280,7 @@ class MainWindow(QMainWindow):
 
         # Inital Tab Widget (Hidden until assembly is complete)
         self.visual_tab_widget = QTabWidget()
-        self.visual_tab_widget.setStyleSheet("background-color: white; color: blue; font-weight: bold;")
+        self.visual_tab_widget.setStyleSheet("background-color: white; color: blue; font-size: 12px; font-weight: bold;")
         self.visual_tab_widget.hide()
         self.visual_constent_layout.addWidget(self.visual_tab_widget)
 
@@ -335,12 +372,31 @@ class MainWindow(QMainWindow):
             card_layout = QVBoxLayout(card)
             card_layout.setContentsMargins(10, 10, 10, 10)
             card_layout.setSpacing(2)
+
+            header_layout = QHBoxLayout()
+            header_layout.setContentsMargins(0, 0, 0, 0)
             
             title = QLabel(f"[{section}]")
             title.setStyleSheet("color: #2c3e50; font-weight: bold; font-size: 14px;")
             title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            card_layout.addWidget(title)
+
+            stats_btn = QPushButton("[ ? ]")
+            stats_btn.setStyleSheet("""
+                QPushButton { background-color: #3498db;  color: white; border-radius: 5px; padding: 4px 8px; font-size: 11px; }
+                QPushButton:hover { background-color: #2980b9; }
+                                    """)
             
+            # When the stats button is clicked, open a dialog box which shows the stats of that section
+            stats_btn.clicked.connect(lambda checked, s=section: self.show_section_stats(s))
+            
+            header_layout.addStretch()
+            header_layout.addWidget(title)
+            header_layout.addStretch()
+            header_layout.addWidget(stats_btn)
+            
+            # Add the horizontal header layout to the vertical card layout
+            card_layout.addLayout(header_layout)
+
             self.single_page_cards_layouts[section] = card_layout
             self.single_page_cards[section] = card
             self.single_page_main_layout.addWidget(card)
@@ -352,16 +408,16 @@ class MainWindow(QMainWindow):
     def tabbed_view(self):
         self.assembly_tabs = QTabWidget()
         self.assembly_tabs.setStyleSheet("""
-            QTabWidget::panel {background-color: #ecf0f1; color: black; border-radius: 10px; padding: 10px; font-weight: bold;}
-            QTabBar::tab {background-color: #2c3e50; color: black; padding: 8px 16px; border-top-left-radius: 6px; border-top-right-radius: 6px; margin-right: 2px; font-weight: bold;}
-            QTabBar::tab:selected {background-color: #ffffff; color: #2c3e50; font-weight: bold;}
+            QTabWidget::panel {background-color: #ecf0f1; color: black; border-radius: 10px; padding: 10px; font-size: 12px; font-weight: bold;}
+            QTabBar::tab {background-color: #2c3e50; color: black; padding: 8px 16px; border-top-left-radius: 6px; border-top-right-radius: 6px; margin-right: 2px; font-size: 12px; font-weight: bold;}
+            QTabBar::tab:selected {background-color: #ffffff; color: #2c3e50; font-size: 12px; font-weight: bold;}
         """)
 
         self.tab_layouts = {}
         self.tab_widgets = {}
         for section in SECTIONS:
             tab_widget = QWidget()
-            tab_widget.setStyleSheet("background-color: #ffffff; color: blue; border-radius: 10px; border-top-left-radius: 0px; padding: 10px; font-weight: bold;")
+            tab_widget.setStyleSheet("background-color: #ffffff; color: blue; border-radius: 10px; border-top-left-radius: 0px; padding: 10px; font-size: 12px; font-weight: bold;")
             tab_layout = QVBoxLayout(tab_widget)
             tab_layout.setContentsMargins(5, 5, 5, 5)
             
@@ -397,7 +453,7 @@ class MainWindow(QMainWindow):
 
         if section == "Starts":
             track_dropdown.addItems(STARTS)
-        elif section == "Thrills 1" or section == "Thrills 2":
+        elif section in ("Thrills 1", "Thrills 2"):
             track_dropdown.addItems(THRILLS)
         elif section == "Turns":
             track_dropdown.addItems(TURNS)
@@ -413,7 +469,7 @@ class MainWindow(QMainWindow):
 
         # Setup the Slider
         length_slider = RangeIndicatorSlider(Qt.Orientation.Horizontal)
-        length_slider.setRange(0, 100)
+        length_slider.setRange(1, 200)
         # ======= Test Value =======
         length_slider.setValue(11)
         # ==========================
@@ -459,6 +515,77 @@ class MainWindow(QMainWindow):
 
         self.tracks[section].append(col_widget)
 
+    def show_section_stats(self, section_name):
+
+        if section_name in self.track_stats and section_name in self.checks:
+            stats = self.track_stats[section_name]
+            check_data = self.checks[section_name]
+
+            # Determine passing status and compile active flags
+            if section_name == "Starts":
+                velocity_status = "PASSED"
+            else:
+                velocity_status = "PASSED" if check_data.get("velocity_check") else "FAILED/STALL"
+
+            if velocity_status == "FAILED/STALL":
+                section_data = {
+                    "Track Status": "FAILED/STALL",
+                    "Exit Velocity": "—",
+                    "Apex (Top) Velocity": "—",
+                    "Valley (Bottom) Velocity": "—",
+                    "Apex (Top) Radius": "—",
+                    "Valley (Bottom) Radius": "—",
+                    "Passed Physics": "—",
+                    "Failed Physics": "—"
+                }
+            else:
+                # Format Velocities cleanly if they exist
+                v_exit = f"{stats['velocity_exit']:.2f} m/s" if stats.get('velocity_exit') is not None else "N/A"
+                v_top = f"{stats['v_top']:.2f} m/s" if stats.get('v_top') is not None else "N/A"
+                v_bot = f"{stats['v_bottom']:.2f} m/s" if stats.get('v_bottom') is not None else "N/A"
+                
+                # Format Radii cleanly if they exist
+                r_top = f"{stats['r_top']:.2f} m" if stats.get('r_top') is not None else "N/A"
+                r_bot = f"{stats['r_bottom']:.2f} m" if stats.get('r_bottom') is not None else "N/A"
+                
+                
+                passed_list = []
+                failed_list = []
+                for check_key, check_val in check_data.items():
+                    if check_key == "velocity_check":
+                        continue  # Handled separately by status
+                    if check_val is True:
+                        passed_list.append(check_key.replace("_check", "").title())
+                    elif check_val is False:
+                        failed_list.append(check_key.replace("_check", "").title())
+
+                section_data = {
+                    "Track Status": velocity_status,
+                    "Exit Velocity": v_exit,
+                    "Apex (Top) Velocity": v_top,
+                    "Valley (Bottom) Velocity": v_bot,
+                    "Apex (Top) Radius": r_top,
+                    "Valley (Bottom) Radius": r_bot,
+                    "Passed Physics": ", ".join(passed_list) if passed_list else "None",
+                    "Failed Physics": ", ".join(failed_list) if failed_list else "None"
+                }
+
+        else:
+            # Default is a blank state
+            section_data = {
+                "Track Status": "Not Generated",
+                "Exit Velocity": "—",
+                "Apex (Top) Velocity": "—",
+                "Valley (Bottom) Velocity": "—",
+                "Apex (Top) Radius": "—",
+                "Valley (Bottom) Radius": "—",
+                "Passed Physics": "—",
+                "Failed Physics": "—"
+            }
+        
+        # Create and display the dialog
+        dialog = StatsDialog(section_name, section_data, parent=self)
+        dialog.exec()
 
     # ========================================================================
     #                       Visual Helper Functions
@@ -509,7 +636,6 @@ class MainWindow(QMainWindow):
         # === 2D View ===
         x_min_top, x_max_top = np.min(X), np.max(X)
         z_min_top, z_max_top = np.min(Z), np.max(Z)
-        
         top_view_x_span = x_max_top - x_min_top
         top_view_y_span = z_max_top - z_min_top
 
@@ -521,6 +647,8 @@ class MainWindow(QMainWindow):
             "sec_4": "red",
             "sec_5": "blue"
         }
+
+
 
         # Calculate tracking properties
         total_track_length = 0
@@ -574,14 +702,33 @@ class MainWindow(QMainWindow):
             elif idx in (3, 4):
                 self.track_plots["section_45"]["ax"].plot(global_2d_horizontal, Z_elevation)
 
-            # --- Fill Combined Subplots concurrently ---
-            # Row 0: Top View Segment-by-Segment coloring
+
             segment_len = len(local_horizontal)
             array_idx_end = array_idx_start + segment_len
             segment_X = X[array_idx_start:array_idx_end]
             segment_Z = Z[array_idx_start:array_idx_end]
             
             axes[0].plot(segment_X, segment_Z, color=segment_color, linewidth=2)
+            
+            
+            if idx < len(xy_composition) - 1:
+                # The last index of the current segment data block
+                transition_idx = array_idx_end - 1
+                
+                # 1. Plot dot on the standalone UI top view
+                self.track_plots["whole_track_topview"]["ax"].plot(
+                    X[transition_idx], Z[transition_idx], 
+                    color='black', marker='o', markersize=6, zorder=5
+                )
+                
+                # 2. Plot dot on the combined figure's top view (row 0)
+                axes[0].plot(
+                    X[transition_idx], Z[transition_idx], 
+                    color='black', marker='o', markersize=6, zorder=5
+                )
+
+            
+            
             array_idx_start = array_idx_end - 1  # Continuous connection pointer
 
             # Rows 1-3: Process Segment-by-Segment zero-aligned views
@@ -641,7 +788,7 @@ class MainWindow(QMainWindow):
             ax.set_title(title, fontsize=font_size)
             canvas.draw()
                 
-            filename = f"{title.lower().replace(' ', '_')}.png"
+            filename = f"{title.lower().replace(' ', '_')}.svg"
             temp_elements = []
 
             # Diagram markers injection unique to individual whole sideview file
@@ -731,26 +878,36 @@ class MainWindow(QMainWindow):
                     linewidth=line.get_linewidth()
                 )
 
+            
+            if plot_type == "top":
+                dot_array_idx = 0
+                for idx, segment in enumerate(xy_composition[:-1]):  # Stop before last segment
+                    dot_array_idx += len(segment["XY"]) - 1
+                    single_ax.plot(
+                        X[dot_array_idx], Z[dot_array_idx], 
+                        color='black', marker='o', markersize=6, zorder=5
+                    )
+
+
+            current_xlim = ax.get_xlim()
+            current_ylim = ax.get_ylim()
+            track_x_data = []
+            track_y_data = []
+
+            for line in ax.get_lines():
+                track_x_data.extend(line.get_xdata())
+                track_y_data.extend(line.get_ydata())
+            track_x_data = np.array(track_x_data, dtype=float)
+            track_y_data = np.array(track_y_data, dtype=float)
+
+
             if plot_type != "top":
-                current_xlim = ax.get_xlim()
-                current_ylim = ax.get_ylim()
-
-                track_x_data = []
-                track_y_data = []
-                for line in ax.get_lines():
-                    track_x_data.extend(line.get_xdata())
-                    track_y_data.extend(line.get_ydata())
-
-                track_x_data = np.array(track_x_data, dtype=float)
-                track_y_data = np.array(track_y_data, dtype=float)
-
-
                 box_physical_width_inches = 22.0
                 box_data_width = float(current_xlim[1] - current_xlim[0])
                 one_inch_in_data_units = box_data_width / box_physical_width_inches
                 
                 step_size = 0.5 * one_inch_in_data_units  
-                tooth_height = one_inch_in_data_units
+                tooth_height = 0.5 * one_inch_in_data_units
 
                 lowest_track_point = float(np.min(track_y_data)) if len(track_y_data) > 0 else 0.0
                 y_baseline = lowest_track_point - (one_inch_in_data_units * 2.0)
@@ -765,10 +922,8 @@ class MainWindow(QMainWindow):
                     return lowest_track_point
 
 
-                
                 if len(track_x_data) > 0:
                     t_min_x, t_max_x = min(track_x_data), max(track_x_data)
-
 
                     span_width = t_max_x - t_min_x
                     num_cycles = int(span_width / (step_size * 2)) + 1
@@ -776,7 +931,6 @@ class MainWindow(QMainWindow):
                     x_pattern = []
                     y_pattern = []
                     
-                    # CRITICAL FIX: Start the pattern right at the left track boundary
                     current_x = t_min_x
 
                     x_pattern.append(current_x)
@@ -807,11 +961,6 @@ class MainWindow(QMainWindow):
                         x_pattern.append(current_x)
                         y_pattern.append(tooth_top)
 
-                    # Close pattern path cleanly exactly at the right track boundary
-                    # if current_x < t_max_x:
-                    #     x_pattern.append(t_max_x)
-                    #     y_pattern.append(y_baseline)
-
 
                     single_ax.plot(
                         np.array(x_pattern, dtype=float), 
@@ -822,18 +971,8 @@ class MainWindow(QMainWindow):
                         zorder=1
                     )
                 
-                    # Example 1: Add a solid reference baseline at y=0 (or y_base)
-                    # This gives your Cricut a solid ground plate path to cut out
-                    # single_ax.plot(
-                    #     [t_min_x, t_max_x], 
-                    #     [y_baseline, y_baseline],                        
-                    #     color='black', 
-                    #     linewidth=1.5, 
-                    #     linestyle='-'
-                    # )
-
-                    single_ax.plot([t_min_x, t_min_x], [0, y_baseline], color='red', linewidth=1.5)
-                    single_ax.plot([t_max_x, t_max_x], [0, y_baseline], color='red', linewidth=1.5)
+                    single_ax.plot([t_min_x, t_min_x], [5, y_baseline], color='black', linewidth=1.5)
+                    single_ax.plot([t_max_x, t_max_x], [5, y_baseline], color='black', linewidth=1.5)
 
                 # Push the viewport limit slightly below the new 2-inch floor layout to keep it visible
                 expanded_ymin = y_baseline - (one_inch_in_data_units * 0.5)
@@ -842,9 +981,27 @@ class MainWindow(QMainWindow):
                 single_ax.set_ylim(ax.get_ylim())
 
         
-            # 4. Apply matching limits, aspect ratios, and kill the bounding boxes
-            single_ax.set_xlim(ax.get_xlim())
-            # single_ax.set_ylim(ax.get_ylim())
+            if len(track_x_data) > 0:
+                data_min_x = np.min(track_x_data)
+                data_max_x = np.max(track_x_data)
+                
+                # If it's a section view with foundation teeth, expand the data bounds to include them
+                if plot_type != "top":
+                    data_min_x = min(data_min_x, min(x_pattern))
+                    data_max_x = max(data_max_x, max(x_pattern))
+
+                # Calculate the exact center of the section data
+                data_mid_x = (data_min_x + data_max_x) / 2.0
+                
+                # Keep the total window width uniform across all SVGs 
+                total_window_width = current_xlim[1] - current_xlim[0]
+                half_width = total_window_width / 2.0
+                
+                # Center the uniform layout window over the data midpoint
+                single_ax.set_xlim(data_mid_x - half_width, data_mid_x + half_width)
+            else:
+                single_ax.set_xlim(ax.get_xlim())
+            
             single_ax.set_aspect('equal', adjustable='box')
             single_ax.axis('off')
             
@@ -874,10 +1031,8 @@ class MainWindow(QMainWindow):
             top=top_fraction,
         )
 
-        fig.savefig("Images/combined_track_views.png", dpi=300)
+        fig.savefig("Images/combined_track_views.svg", dpi=300)
         plt.close(fig)
-
-
 
 
 
@@ -1060,9 +1215,8 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "No Tracks", "No valid tracks to assemble.")
             return
         
-        # Ask the user for their section and coaster name
+        # === Ask the user for their section and coaster name ===
         dialog = DualInputDialog(self)
-
         if dialog.exec() == QDialog.DialogCode.Accepted:
             section_name, coaster_name = dialog.get_inputs()
 
@@ -1070,7 +1224,6 @@ class MainWindow(QMainWindow):
                 section_name = "Test"
             if not coaster_name.strip():
                 coaster_name = "Combined Coaster"
-
             print(f"Section: {section_name} | Coaster: {coaster_name}")
         
         else:
@@ -1084,9 +1237,11 @@ class MainWindow(QMainWindow):
 
         # Assemble and visualize tracks
         try:
-            combined_track, xy_composition, velocity_n_radius, checks = tracks.TrackPart.combine_tracks(*data, coaster_name=coaster_name)
-                        
-            wait.close()
+            combined_track, xy_composition, track_stats, checks = tracks.TrackPart.combine_tracks(*data, coaster_name=coaster_name)
+            self.track_stats, self.checks = track_stats, checks
+
+            if wait.isVisible():  
+                wait.close()
 
             # Display physics failures to user if any occurred
             warnings = self.process_physics_checks(checks)
@@ -1113,5 +1268,3 @@ if __name__ == "__main__":
         sys.exit(app.exec())
     except Exception as sys_error:
         print(f"CRITICAL SYSTEM CRASH DETECTED: {sys_error}")
-
-    

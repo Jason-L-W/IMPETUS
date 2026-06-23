@@ -230,7 +230,7 @@ class MainWindow(QMainWindow):
         self.setup_selector.addItems(["Setup 1: All on 1 Page", "Setup 2: Tabbed View"])
         self.setup_selector.setStyleSheet("""
             QComboBox { background-color: white; color: #2c3e50; padding: 6px; border-radius: 5px; font-size: 12px; font-weight: bold; }
-            QComboBox QAbstractItemView { background-color: white; border-radius: 5px; font-size: 12px; font-weight: bold; }
+            QComboBox QAbstractItemView { background-color: white; color: black; border-radius: 5px; font-size: 12px; font-weight: bold; }
                                           """)
         selector_layout.addWidget(selector_label)
         selector_layout.addWidget(self.setup_selector)
@@ -512,40 +512,50 @@ class MainWindow(QMainWindow):
 
         self.tracks[section].append(col_widget)
 
-    def show_section_stats(self, section_name):
-
+    def show_section_stats(self, section_name):        
         if section_name in self.track_stats and section_name in self.checks:
+            track_type = self.track_stats[section_name]["type"]
             stats = self.track_stats[section_name]
             check_data = self.checks[section_name]
 
-            # Determine passing status and compile active flags
+            # Checks the Starts section of the track
             if section_name == "Starts":
                 velocity_status = "PASSED"
             else:
                 velocity_status = "PASSED" if check_data.get("velocity_check") else "FAILED/STALL"
 
-            if velocity_status == "FAILED/STALL":
-                section_data = {
-                    "Track Status": "FAILED/STALL",
-                    "Exit Velocity": "—",
-                    "Apex (Top) Velocity": "—",
-                    "Valley (Bottom) Velocity": "—",
-                    "Apex (Top) Radius": "—",
-                    "Valley (Bottom) Radius": "—",
-                    "Passed Physics": "—",
-                    "Failed Physics": "—"
-                }
-            else:
-                # Format Velocities cleanly if they exist
-                v_exit = f"{stats['velocity_exit']:.2f} m/s" if stats.get('velocity_exit') is not None else "N/A"
-                v_top = f"{stats['v_top']:.2f} m/s" if stats.get('v_top') is not None else "N/A"
-                v_bot = f"{stats['v_bottom']:.2f} m/s" if stats.get('v_bottom') is not None else "N/A"
+            section_data = {"Track Status": velocity_status}
+
+            # Checks the rest of the sections
+            if velocity_status != "FAILED/STALL":
+                if stats.get('velocity_exit') is not None:
+                    section_data["Exit Velocity"] = f"{stats['velocity_exit']:.2f} m/s"
+
+                if section_name.startswith("Thrills") or section_name == "Turns":
+                    if "Helix" not in str(stats.get('type', '')):
+                        if stats.get('v_top') is not None:
+                            section_data["Apex (Top) Velocity"] = f"{stats['v_top']:.2f} m/s"
+                        if stats.get('v_bottom') is not None:
+                            section_data["Valley (Bottom) Velocity"] = f"{stats['v_bottom']:.2f} m/s"
                 
-                # Format Radii cleanly if they exist
-                r_top = f"{stats['r_top']:.2f} m" if stats.get('r_top') is not None else "N/A"
-                r_bot = f"{stats['r_bottom']:.2f} m" if stats.get('r_bottom') is not None else "N/A"
-                
-                
+                    if stats.get('r_top') is not None:
+                        section_data["Apex (Top) Radius"] = f"{stats['r_top']:.2f} m"
+                    if stats.get('r_bottom') is not None:
+                        section_data["Valley (Bottom) Radius"] = f"{stats['r_bottom']:.2f} m"
+
+
+                    if stats.get('deg_banking') is not None:
+                        section_data["Degrees Banking"] = f"{stats['deg_banking']:.2f}°"
+                    
+                    if stats.get('deg_banking_top') is not None:
+                        section_data["Degrees Top (X max)"] = f"{stats['deg_banking_top']:.2f}°"
+                    
+                    if stats.get('deg_banking_bottom') is not None:
+                        section_data["Degrees Bottom (X max)"] = f"{stats['deg_banking_bottom']:.2f}°"
+
+                # if section_name == "Ends" and :
+                    
+
                 passed_list = []
                 failed_list = []
                 for check_key, check_val in check_data.items():
@@ -556,33 +566,21 @@ class MainWindow(QMainWindow):
                     elif check_val is False:
                         failed_list.append(check_key.replace("_check", "").title())
 
-                section_data = {
-                    "Track Status": velocity_status,
-                    "Exit Velocity": v_exit,
-                    "Apex (Top) Velocity": v_top,
-                    "Valley (Bottom) Velocity": v_bot,
-                    "Apex (Top) Radius": r_top,
-                    "Valley (Bottom) Radius": r_bot,
-                    "Passed Physics": ", ".join(passed_list) if passed_list else "None",
-                    "Failed Physics": ", ".join(failed_list) if failed_list else "None"
-                }
+                if passed_list:
+                    section_data["Passed Physics"] = ", ".join(passed_list)
+                if failed_list:
+                    section_data["Failed Physics"] = ", ".join(failed_list)
 
         else:
             # Default is a blank state
             section_data = {
                 "Track Status": "Not Generated",
-                "Exit Velocity": "—",
-                "Apex (Top) Velocity": "—",
-                "Valley (Bottom) Velocity": "—",
-                "Apex (Top) Radius": "—",
-                "Valley (Bottom) Radius": "—",
-                "Passed Physics": "—",
-                "Failed Physics": "—"
             }
         
         # Create and display the dialog
         dialog = StatsDialog(section_name, section_data, parent=self)
         dialog.exec()
+
 
     # ========================================================================
     #                       Visual Helper Functions
@@ -636,7 +634,6 @@ class MainWindow(QMainWindow):
         top_view_x_span = x_max_top - x_min_top
         top_view_y_span = z_max_top - z_min_top
 
-
         section_colors = {
             "sec_1": "#1f77b4",  # Blue
             "sec_2": "#ff7f0e",  # Orange
@@ -671,11 +668,11 @@ class MainWindow(QMainWindow):
             {"title": "Section 4-5",          "xlabel": "XY", "ylabel": "Z", "type": "sec_45"}
         ]
 
-        # --- 2. Plotting Individual Segments & Core Views ---
-        # A. Plot the Native Top View to UI dict
-        self.track_plots["whole_track_topview"]["ax"].plot(X, Z)
+        # === Plotting Individual Segments ===
+        # Top View
+        self.track_plots["whole_track_topview"]["ax"].plot(X, Z, color='black')
 
-        # B. Populate Data across UI Plots and the new Combined Subplots
+        # Side view
         current_horizontal_offset = 0
         array_idx_start = 0
 
@@ -698,7 +695,6 @@ class MainWindow(QMainWindow):
             elif idx in (3, 4):
                 self.track_plots["section_45"]["ax"].plot(global_2d_horizontal, Z_elevation)
 
-
             segment_len = len(local_horizontal)
             array_idx_end = array_idx_start + segment_len
             segment_X = X[array_idx_start:array_idx_end]
@@ -709,7 +705,7 @@ class MainWindow(QMainWindow):
             
             if idx < len(xy_composition) - 1:
                 # The last index of the current segment data block
-                transition_idx = array_idx_end - 1
+                transition_idx = min(array_idx_end - 1, len(X) - 1)
                 
                 # 1. Plot dot on the standalone UI top view
                 self.track_plots["whole_track_topview"]["ax"].plot(
@@ -722,12 +718,10 @@ class MainWindow(QMainWindow):
                     X[transition_idx], Z[transition_idx], 
                     color='black', marker='o', markersize=6, zorder=5
                 )
-
-            
             
             array_idx_start = array_idx_end - 1  # Continuous connection pointer
 
-            # Rows 1-3: Process Segment-by-Segment zero-aligned views
+            # Side view by sections
             for ax_idx, config in enumerate(combined_configs[1:], start=1):
                 plot_type = config["type"]
                 is_in_this_row = (
@@ -746,8 +740,8 @@ class MainWindow(QMainWindow):
 
             current_horizontal_offset = global_2d_horizontal[-1]
 
-        # --- 3. Finalize Formatting, Scaling, and File Outputs ---
-        # A. Format and save the individual UI plot windows
+        # === Finalize Formatting, Scaling, and File Outputs ===
+        # Format and save the individual UI plot windows
         view_configs = [
             ("whole_track_topview",     "Whole Track Top View",     "X",    "Y", True),
             ("whole_track_sideview",    "Whole Track Side View",    "XY",   "Z", False),
@@ -837,6 +831,7 @@ class MainWindow(QMainWindow):
         for ax_idx, config in enumerate(combined_configs):
             ax = axes[ax_idx]
             plot_type = config["type"]
+            x_pattern, y_pattern = [], []
 
             if plot_type == "top":
                 ax.plot(x_min_top, 0, 'go', markersize=8)
@@ -1030,9 +1025,6 @@ class MainWindow(QMainWindow):
         plt.close(fig)
 
 
-
-
-
     # ========================================================================
     #               Recommendation Based on 'Starts' Input
     # ========================================================================
@@ -1085,12 +1077,6 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"Recommendation update idle: {e}")
 
-
-    # ========================================================================
-    #                           Proccesing Data
-    # ========================================================================
-    def process_data(self):
-        return
 
 
     # ========================================================================
@@ -1232,14 +1218,17 @@ class MainWindow(QMainWindow):
 
         # Assemble and visualize tracks
         try:
-            combined_track, xy_composition, track_stats, checks = tracks.TrackPart.combine_tracks(*data, coaster_name=coaster_name)
-            self.track_stats, self.checks = track_stats, checks
+            combined_track, xy_composition, track_data = tracks.TrackPart.combine_tracks(*data, coaster_name=coaster_name)
+            all_track_stats = {name: {"type": data["section_type"], **data["stats"]} for name, data in track_data.items()}
+            all_track_checks = {name: data["checks"] for name, data in track_data.items()}
+            
+            self.track_stats, self.checks = all_track_stats, all_track_checks
 
             if wait.isVisible():  
                 wait.close()
 
             # Display physics failures to user if any occurred
-            warnings = self.process_physics_checks(checks)
+            warnings = self.process_physics_checks(all_track_checks)
             if warnings:
                 warning_msg = "The track was built, but failed the following physics checks:\n\n" + "\n".join(warnings)
                 QMessageBox.warning(self, "Physics Warning", warning_msg)

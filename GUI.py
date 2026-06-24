@@ -15,6 +15,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import tracks
+import file_utils
 from recommendation import EnergyRecommendation
 
 # When adding new track types, they should be added to the ALL_TRACKS list and the track_function_map dictionary below.
@@ -287,6 +288,7 @@ class MainWindow(QMainWindow):
         # === Tab 1: 3D Visualization ===
         fig_3d = Figure(layout="constrained")  # Use constrained layout for better spacing
         canvas_3d = FigureCanvas(fig_3d)
+        canvas_3d.setMinimumSize(200, 200)
         ax_3d = fig_3d.add_subplot(111, projection='3d')
 
         self.track_plots["3d"] = {
@@ -313,12 +315,8 @@ class MainWindow(QMainWindow):
         for key, tab_title in tabs_2d:
             fig = Figure(figsize=(24, 12))
             canvas = FigureCanvas(fig)
-
-            left_margin = 1.0 / 24.0
-            bottom_margin = 1.0 / 12.0
-            plot_width = (24.0 - 2.0) / 24.0
-            plot_height = (12.0 - 2.0) / 12.0
-            ax = fig.add_axes([left_margin, bottom_margin, plot_width, plot_height])
+            canvas.setMinimumSize(200, 200)
+            ax = fig.add_subplot(111)
 
             self.track_plots[key] = {
                 "figure": fig,
@@ -460,14 +458,14 @@ class MainWindow(QMainWindow):
         # Setup the Length Input Field
         length_input = QLineEdit()
         length_input.setPlaceholderText("Track Length (Meters)")
-        # ======= Test Value =======
-        length_input.setText("11")
-        # ==========================
+        
 
         # Setup the Slider
         length_slider = RangeIndicatorSlider(Qt.Orientation.Horizontal)
-        length_slider.setRange(1, 200)
+        length_slider.setRange(1, 100)
+
         # ======= Test Value =======
+        length_input.setText("11")
         length_slider.setValue(11)
         # ==========================
         
@@ -590,9 +588,7 @@ class MainWindow(QMainWindow):
         self.visual_tab_widget.show()  # Show the visual widget
 
         X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name = track_data
-        font_size = 8
-        grid_padding = 5
-        cushion = 5
+        font_size, grid_padding= 8, 5
 
         for plot in self.track_plots.values():
             plot["ax"].clear()
@@ -634,20 +630,9 @@ class MainWindow(QMainWindow):
         top_view_x_span = x_max_top - x_min_top
         top_view_y_span = z_max_top - z_min_top
 
-        section_colors = {
-            "sec_1": "#1f77b4",  # Blue
-            "sec_2": "#ff7f0e",  # Orange
-            "sec_3": "#2ca02c",  # Green
-            "sec_4": "red",
-            "sec_5": "blue"
-        }
-
-
         # Calculate tracking properties
-        total_track_length = 0
         segment_boundaries = {}
         current_horizontal_offset = 0
-        
         for idx, segment in enumerate(xy_composition):
             local_horizontal = segment["XY"]
             global_2d_horizontal = local_horizontal + current_horizontal_offset
@@ -656,21 +641,14 @@ class MainWindow(QMainWindow):
                 "start_x": global_2d_horizontal[0],
                 "end_x": global_2d_horizontal[-1],
             }
-            total_track_length += (local_horizontal[-1] - local_horizontal[0])
-            current_horizontal_offset = global_2d_horizontal[-1]
 
-        # Initialize the single, shared layout figure (4 rows)
-        fig, axes = plt.subplots(4, 1, figsize=(24, 48))
-        combined_configs = [
-            {"title": "Whole Track Top View", "xlabel": "X",  "ylabel": "z", "type": "top"},
-            {"title": "Section 1-2",           "xlabel": "XY", "ylabel": "Z", "type": "sec_12"},
-            {"title": "Section 3",            "xlabel": "XY", "ylabel": "Z", "type": "sec_3"},
-            {"title": "Section 4-5",          "xlabel": "XY", "ylabel": "Z", "type": "sec_45"}
-        ]
+            current_horizontal_offset = global_2d_horizontal[-1]
 
         # === Plotting Individual Segments ===
         # Top View
         self.track_plots["whole_track_topview"]["ax"].plot(X, Z, color='black')
+        # Starting point
+        self.track_plots["whole_track_topview"]["ax"].plot(0, 0, color='black', marker='o', markersize=6, zorder=5)
 
         # Side view
         current_horizontal_offset = 0
@@ -681,10 +659,6 @@ class MainWindow(QMainWindow):
             Z_elevation = segment["Z"]
             global_2d_horizontal = local_horizontal + current_horizontal_offset
             
-            # Match segment color key safely
-            color_key = f"sec_{idx+1}"
-            segment_color = section_colors.get(color_key, "gray")
-
             # Update the individual standalone views
             self.track_plots["whole_track_sideview"]["ax"].plot(global_2d_horizontal, Z_elevation)
 
@@ -697,11 +671,6 @@ class MainWindow(QMainWindow):
 
             segment_len = len(local_horizontal)
             array_idx_end = array_idx_start + segment_len
-            segment_X = X[array_idx_start:array_idx_end]
-            segment_Z = Z[array_idx_start:array_idx_end]
-            
-            axes[0].plot(segment_X, segment_Z, color=segment_color, linewidth=2)
-            
             
             if idx < len(xy_composition) - 1:
                 # The last index of the current segment data block
@@ -712,32 +681,8 @@ class MainWindow(QMainWindow):
                     X[transition_idx], Z[transition_idx], 
                     color='black', marker='o', markersize=6, zorder=5
                 )
-                
-                # 2. Plot dot on the combined figure's top view (row 0)
-                axes[0].plot(
-                    X[transition_idx], Z[transition_idx], 
-                    color='black', marker='o', markersize=6, zorder=5
-                )
             
-            array_idx_start = array_idx_end - 1  # Continuous connection pointer
-
-            # Side view by sections
-            for ax_idx, config in enumerate(combined_configs[1:], start=1):
-                plot_type = config["type"]
-                is_in_this_row = (
-                    (plot_type == "sec_12" and idx in (0, 1)) or
-                    (plot_type == "sec_3"  and idx == 2) or
-                    (plot_type == "sec_45" and idx in (3, 4))
-                )
-                if is_in_this_row:
-                    # Resolve row offset based on the very first element of this specific row
-                    row_start_offset = segment_boundaries[0]["start_x"] if idx in (0, 1) else (
-                                       segment_boundaries[2]["start_x"] if idx == 2 else 
-                                       segment_boundaries[3]["start_x"])
-                    
-                    zero_aligned_horizontal = global_2d_horizontal - row_start_offset
-                    axes[ax_idx].plot(zero_aligned_horizontal, Z_elevation, color=segment_color, linewidth=2)
-
+            array_idx_start = array_idx_end - 1
             current_horizontal_offset = global_2d_horizontal[-1]
 
         # === Finalize Formatting, Scaling, and File Outputs ===
@@ -753,7 +698,6 @@ class MainWindow(QMainWindow):
         for key, title, xlabel, ylabel, is_top_view in view_configs:
             plot = self.track_plots[key]
             ax, canvas = plot["ax"], plot["canvas"]
-
             ax.relim()
             ax.autoscale_view()
 
@@ -761,13 +705,11 @@ class MainWindow(QMainWindow):
                 ax.set_xlim(x_min_top, x_max_top)
                 ax.set_ylim(z_min_top, z_max_top)
                 ax.axis('scaled')
+
             else:
                 ax.autoscale(True, axis='both')
-                current_x_min, current_x_max = ax.get_xlim()
-                current_y_min, current_y_max = ax.get_ylim()
-                
-                mid_x = (current_x_min + current_x_max) / 2.0
-                mid_y = (current_y_min + current_y_max) / 2.0
+                mid_x = np.sum(ax.get_xlim()) / 2.0
+                mid_y = np.sum(ax.get_ylim()) / 2.0
                 
                 ax.set_xlim(mid_x - (top_view_x_span / 2.0), mid_x + (top_view_x_span / 2.0))
                 ax.set_ylim(mid_y - (top_view_y_span / 2.0), mid_y + (top_view_y_span / 2.0))
@@ -777,252 +719,9 @@ class MainWindow(QMainWindow):
             ax.set_ylabel(ylabel, fontsize=font_size)
             ax.set_title(title, fontsize=font_size)
             canvas.draw()
-                
-            filename = f"{title.lower().replace(' ', '_')}.svg"
-            temp_elements = []
 
-            # Diagram markers injection unique to individual whole sideview file
-            if key == "whole_track_sideview":
-                y_min, y_max = ax.get_ylim()
-                padding = (y_max - y_min) * 0.8
-                new_y_min = y_min - padding
-                ax.set_ylim(bottom=new_y_min)
-
-                canvas_floor_y = new_y_min
-                upper_hline_y = new_y_min + (padding * 0.85)
-                lower_hline_y = new_y_min + (padding * 0.35)
-                label_y = new_y_min + (padding * 0.60)
-
-                global_start_x = segment_boundaries[0]["start_x"]
-                global_end_x = segment_boundaries[max(segment_boundaries.keys())]["end_x"]
-                
-                upper_hline, = ax.plot([global_start_x, global_end_x], [upper_hline_y, upper_hline_y], color='red', linestyle='-', linewidth=0.6, zorder=1)
-                temp_elements.append(upper_hline)
-                lower_hline, = ax.plot([global_start_x, global_end_x], [lower_hline_y, lower_hline_y], color='blue', linestyle='-', linewidth=0.6, zorder=1)
-                temp_elements.append(lower_hline)
-
-                first_vline, = ax.plot([global_start_x, global_start_x], [canvas_floor_y, upper_hline_y], color='gray', linestyle='-', linewidth=0.6, zorder=1)
-                temp_elements.append(first_vline)
-                last_vline, = ax.plot([global_end_x, global_end_x], [canvas_floor_y, upper_hline_y], color='gray', linestyle='-', linewidth=0.6, zorder=1)
-                temp_elements.append(last_vline)
-
-                for idx, bounds in segment_boundaries.items():
-                    mid_x_loc = (bounds["start_x"] + bounds["end_x"]) / 2.0
-                    section_name = ax.text(x=mid_x_loc, y=label_y, s=f"Section {idx+1}", fontsize=font_size * 0.6, color='black', ha='center', va='center')
-                    temp_elements.append(section_name)
-
-                    if idx < len(segment_boundaries) - 1:
-                        sub_vline, = ax.plot([bounds["end_x"], bounds["end_x"]], [canvas_floor_y, lower_hline_y], color='gray', linestyle='-', linewidth=0.6, zorder=2)
-                        temp_elements.append(sub_vline)
-
-            ax.axis('off')
-            ax.set_title(title, fontsize=font_size * 0.5)
-            ax.figure.savefig(f"Images/{filename}", dpi=300)
-            ax.set_title(title, fontsize=font_size)
-            ax.axis('on')
-
-            # Clean artifacts
-            for element in temp_elements:
-                element.remove()
-            if key == "whole_track_sideview":
-                ax.set_ylim(y_min, y_max)
-
-        # B. Format and save the multi-row combined image configuration
-        for ax_idx, config in enumerate(combined_configs):
-            ax = axes[ax_idx]
-            plot_type = config["type"]
-            x_pattern, y_pattern = [], []
-
-            if plot_type == "top":
-                ax.plot(x_min_top, 0, 'go', markersize=8)
-                ax.plot(x_max_top, 0, 'go', markersize=8)
-                ax.set_xlim(x_min_top - cushion, x_max_top + cushion)
-                ax.set_ylim(z_min_top - cushion, z_max_top + cushion)
-            else:
-                # Dynamically evaluate bounding constraints on drawn lines inside this specific subplot row
-                lines = ax.get_lines()
-                if lines:
-                    local_y_all = [np.min(l.get_ydata()) for l in lines] + [np.max(l.get_ydata()) for l in lines]
-                    y_base = min(local_y_all)
-                else:
-                    y_base = 0
-
-                ax.set_xlim(x_min_top - cushion, x_max_top + cushion)
-                ax.set_ylim(y_base - cushion, y_base + top_view_y_span + cushion)
-            
-            ax.set_aspect('equal', adjustable='box')
-            ax.axis('off')
-
-            single_fig = plt.figure(figsize=(24, 12))
-            
-            # 2. Hardcode the exact same fractional 1-inch boundaries
-            s_left, s_bottom = 1.0 / 24.0, 1.0 / 12.0
-            s_width, s_height = (24.0 - 2.0) / 24.0, (12.0 - 2.0) / 12.0
-            single_ax = single_fig.add_axes([s_left, s_bottom, s_width, s_height])
-            
-            # 3. Duplicate the track lines from the current row into this single figure
-            for line in ax.get_lines():
-                single_ax.plot(
-                    line.get_xdata(), 
-                    line.get_ydata(), 
-                    color=line.get_color(), 
-                    linewidth=line.get_linewidth()
-                )
-
-            
-            if plot_type == "top":
-                dot_array_idx = 0
-                for idx, segment in enumerate(xy_composition[:-1]):  # Stop before last segment
-                    dot_array_idx += len(segment["XY"]) - 1
-                    single_ax.plot(
-                        X[dot_array_idx], Z[dot_array_idx], 
-                        color='black', marker='o', markersize=6, zorder=5
-                    )
-
-            current_xlim = ax.get_xlim()
-            current_ylim = ax.get_ylim()
-            track_x_data = []
-            track_y_data = []
-
-            for line in ax.get_lines():
-                track_x_data.extend(line.get_xdata())
-                track_y_data.extend(line.get_ydata())
-            track_x_data = np.array(track_x_data, dtype=float)
-            track_y_data = np.array(track_y_data, dtype=float)
-
-
-            if plot_type != "top":
-                box_physical_width_inches = 22.0
-                box_data_width = float(current_xlim[1] - current_xlim[0])
-                one_inch_in_data_units = box_data_width / box_physical_width_inches
-                
-                step_size = 0.5 * one_inch_in_data_units  
-                tooth_height = 0.5 * one_inch_in_data_units
-
-                lowest_track_point = float(np.min(track_y_data)) if len(track_y_data) > 0 else 0.0
-                y_baseline = lowest_track_point - (one_inch_in_data_units * 2.0)
-                
-
-                def get_track_height_at(x_pos):
-                    if len(track_x_data) == 0:
-                        return lowest_track_point
-                    close_indices = np.where(np.abs(track_x_data - x_pos) <= (step_size * 2))[0]
-                    if len(close_indices) > 0:
-                        return float(np.min(track_y_data[close_indices]))
-                    return lowest_track_point
-
-
-                if len(track_x_data) > 0:
-                    t_min_x, t_max_x = min(track_x_data), max(track_x_data)
-
-                    span_width = t_max_x - t_min_x
-                    num_cycles = int(span_width / (step_size * 2)) + 1
-
-                    x_pattern = []
-                    y_pattern = []
-                    
-                    current_x = t_min_x
-
-                    x_pattern.append(current_x)
-                    y_pattern.append(y_baseline)
-
-
-                    for _ in range(num_cycles):
-                        local_ceiling = get_track_height_at(current_x + (step_size / 2.0))
-                        tooth_top = min(y_baseline + tooth_height, -(one_inch_in_data_units * 0.2))
-
-                        # 1. Move DOWN (into the gap floor)
-                        current_x += 0.0
-                        x_pattern.extend([current_x, current_x])
-                        y_pattern.extend([tooth_top, y_baseline])
-                        
-                        # 2. Move RIGHT (along the foundation floor gap)
-                        current_x += step_size
-                        x_pattern.append(current_x)
-                        y_pattern.append(y_baseline)
-                        
-                        # 3. Move UP (forming the right wall of the gap / left wall of the next tooth)
-                        current_x += 0.0
-                        x_pattern.extend([current_x, current_x])
-                        y_pattern.extend([y_baseline, tooth_top])
-                        
-                        # 4. Move RIGHT (along the top ceiling of the tooth)
-                        current_x += step_size
-                        x_pattern.append(current_x)
-                        y_pattern.append(tooth_top)
-
-
-                    single_ax.plot(
-                        np.array(x_pattern, dtype=float), 
-                        np.array(y_pattern, dtype=float), 
-                        color='black', 
-                        linewidth=1.5, 
-                        linestyle='-',
-                        zorder=1
-                    )
-                
-                    single_ax.plot([t_min_x, t_min_x], [5, y_baseline], color='black', linewidth=1.5)
-                    single_ax.plot([t_max_x, t_max_x], [5, y_baseline], color='black', linewidth=1.5)
-
-                # Push the viewport limit slightly below the new 2-inch floor layout to keep it visible
-                expanded_ymin = y_baseline - (one_inch_in_data_units * 0.5)
-                single_ax.set_ylim(expanded_ymin, current_ylim[1])
-            else:
-                single_ax.set_ylim(ax.get_ylim())
-
-        
-            if len(track_x_data) > 0:
-                data_min_x = np.min(track_x_data)
-                data_max_x = np.max(track_x_data)
-                
-                # If it's a section view with foundation teeth, expand the data bounds to include them
-                if plot_type != "top":
-                    data_min_x = min(data_min_x, min(x_pattern))
-                    data_max_x = max(data_max_x, max(x_pattern))
-
-                # Calculate the exact center of the section data
-                data_mid_x = (data_min_x + data_max_x) / 2.0
-                
-                # Keep the total window width uniform across all SVGs 
-                total_window_width = current_xlim[1] - current_xlim[0]
-                half_width = total_window_width / 2.0
-                
-                # Center the uniform layout window over the data midpoint
-                single_ax.set_xlim(data_mid_x - half_width, data_mid_x + half_width)
-            else:
-                single_ax.set_xlim(ax.get_xlim())
-            
-            single_ax.set_aspect('equal', adjustable='box')
-            single_ax.axis('off')
-            
-            # 5. Export as a crisp standalone file
-            safe_title = config["title"].lower().replace(' ', '_').replace('-', '_')
-            single_fig.savefig(
-                f"Images/individual123_{safe_title}.svg",
-                dpi=300,
-                transparent=True,
-                facecolor='none',
-                pad_inches=0 # Preserves structural 1-inch borders perfectly
-            )
-            plt.close(single_fig) # Free up system memory instantly
-
-        left_fraction   = 1.0 / 24.0          # Approx 0.0417
-        right_fraction  = 1.0 - (1.0 / 24.0)  # Approx 0.9583
-        bottom_fraction = 1.0 / 12.0          # Approx 0.0833
-        top_fraction    = 1.0 - (1.0 / 12.0)  # Approx 0.9167
-
-        total_height_span = top_fraction - bottom_fraction
-        row_height = total_height_span / 4.0
-
-        fig.subplots_adjust(
-            left=left_fraction, 
-            right=right_fraction, 
-            bottom=bottom_fraction, 
-            top=top_fraction,
-        )
-
-        fig.savefig("Images/combined_track_views.svg", dpi=300)
-        plt.close(fig)
+            # Automatically call to export the files
+            file_utils.export_layouts(track_data, xy_composition, self.track_plots)
 
 
     # ========================================================================
@@ -1058,8 +757,8 @@ class MainWindow(QMainWindow):
             recs = EnergyRecommendation.get_recommendations(start_type, start_val)
             
             # Loop through all subsequent sections to update their slider bounds
-            for section_key in ["Thrills 1", "Turns", "Thrills 2"]:
-                for row in self.tracks.get(section_key, []):
+            for section_name in ["Thrills 1", "Turns", "Thrills 2"]:
+                for row in self.tracks.get(section_name, []):
                     row_dropdown = row.findChild(QComboBox)
                     row_slider = row.findChild(RangeIndicatorSlider)
                     
@@ -1084,43 +783,43 @@ class MainWindow(QMainWindow):
     # ========================================================================
     def process_physics_checks(self, checks):
         warnings = []
-        for section_key, section_data in checks.items():
-            if section_key == "Starts":
+        for section_name, section_data in checks.items():
+            if section_name == "Starts":
                 continue
 
             section_passed = True
 
             if not section_data.get("velocity_check", True):
-                warnings.append(f"{section_key}: Not enough velocity to get through this section.")
+                warnings.append(f"{section_name}: Not enough velocity to get through this section.")
                 section_passed = False
 
             if section_data.get("valley_check") is False:
-                warnings.append(f"{section_key}: Valley G-force exceeds 5Gs.")
+                warnings.append(f"{section_name}: Valley G-force exceeds 5Gs.")
                 section_passed = False
 
             if section_data.get("inversion_check") is False:
-                warnings.append(f"{section_key}: Not enough speed to clear inversion peak.")
+                warnings.append(f"{section_name}: Not enough speed to clear inversion peak.")
                 section_passed = False
 
             if section_data.get("peak_check") is False:
-                warnings.append(f"{section_key}: Speed too high over crest (Airborne).")
+                warnings.append(f"{section_name}: Speed too high over crest (Airborne).")
                 section_passed = False
 
             if section_data.get("lateral_check") is False:
-                warnings.append(f"{section_key}: Lateral turning G-forces exceed safe rider comfort (>1.5G).")
+                warnings.append(f"{section_name}: Lateral turning G-forces exceed safe rider comfort (>1.5G).")
                 section_passed = False
 
             if section_data.get("rollup_check") is False:
-                warnings.append(f"{section_key}: Rollup incline is too tall. Train will stall.")
+                warnings.append(f"{section_name}: Rollup incline is too tall. Train will stall.")
                 section_passed = False
 
             if section_data.get("brake_check") is False:
-                warnings.append(f"{section_key}: Entry speed into exceeds allowed stopping threshold.")
+                warnings.append(f"{section_name}: Entry speed into exceeds allowed stopping threshold.")
                 section_passed = False
 
             # Changes the color of the section, based on whether they passed or failed the checks
-            if section_key in self.single_page_cards:
-                card_widget = self.single_page_cards[section_key]
+            if section_name in self.single_page_cards:
+                card_widget = self.single_page_cards[section_name]
                 if section_passed:
                     card_widget.setStyleSheet("background-color: #2ecc71; color: #ffffff; border-radius: 10px; margin-bottom: 2px; padding: 2px;")
                 else:

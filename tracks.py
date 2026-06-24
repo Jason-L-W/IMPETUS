@@ -1,5 +1,5 @@
 import numpy as np
-import read_write_csv as CSV
+import file_utils
 import matplotlib.pyplot as plt
 
 # This class is used to store all track part functions
@@ -17,7 +17,7 @@ class TrackPart:
     # Given data (csv file) of a real track, this function will read the data and return the track
     # part which is scaled, based on the user input.
     def from_data(scale, track_name):
-        data = CSV.read_csv(f"{track_name}.csv")
+        data = file_utils.read_csv(f"{track_name}.csv")
         track_data = data.copy()
 
         # Scales the track based on your input scale
@@ -29,7 +29,7 @@ class TrackPart:
         Nx, Ny, Nz = track_data[:, 10], track_data[:, 11], track_data[:, 12]
 
         pts = len(track_data)
-        CSV.write_csv(track_data, pts, scale, track_name)
+        file_utils.write_csv(track_data, pts, scale, track_name)
         track_content = X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, track_name
         return track_content
 
@@ -55,7 +55,7 @@ class TrackPart:
 
         data = np.column_stack((np.arange(1, pts+1), X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz))
         file_name = "launcher"
-        CSV.write_csv(data, pts, L, file_name)
+        file_utils.write_csv(data, pts, L, file_name)
         track_content = (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name)
         
         # v_exit = sqrt(2 * 2.5g * L) where a is the acceleration and L is the length of the track
@@ -66,7 +66,7 @@ class TrackPart:
     @staticmethod
     def lifthill_func(h):
         # h is the max height
-        data = CSV.read_csv("cometlifthill.csv")
+        data = file_utils.read_csv("cometlifthill.csv")
         lifthill = data.copy()
 
         # Scales the track based on your input height
@@ -79,7 +79,7 @@ class TrackPart:
 
         pts = len(lifthill)
         file_name = "lifthill"
-        CSV.write_csv(lifthill, pts, h, file_name)
+        file_utils.write_csv(lifthill, pts, h, file_name)
         track_content = (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name)
         max_y = np.max(Y)
         v_exit = np.sqrt(2 * 9.8 * max_y)
@@ -147,7 +147,7 @@ class TrackPart:
 
         data = np.column_stack((np.arange(1, pts+1), X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz))
         file_name = "rollback"
-        CSV.write_csv(data, pts, h, file_name)
+        file_utils.write_csv(data, pts, h, file_name)
         track_content = (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name)
         v_exit = np.sqrt(2 * 9.8 * h)
         return track_content, v_exit
@@ -159,7 +159,7 @@ class TrackPart:
     # Camelback track part (done)
     @staticmethod
     def camelback_func(h):
-        data = CSV.read_csv("cometcamelback.csv")
+        data = file_utils.read_csv("cometcamelback.csv")
         camelback = data.copy()
 
         # Scales the track based on your input height
@@ -173,7 +173,7 @@ class TrackPart:
 
         pts = len(camelback)
         file_name = "camelback"
-        CSV.write_csv(camelback, pts, h, file_name)
+        file_utils.write_csv(camelback, pts, h, file_name)
         track_content = (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name)
         return track_content
 
@@ -286,7 +286,7 @@ class TrackPart:
         pts = len(X)
         data = np.column_stack((np.arange(1, pts+1), X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz))
         file_name = "corkscrew"
-        CSV.write_csv(data, pts, r1, file_name)
+        file_utils.write_csv(data, pts, r1, file_name)
         track_content = (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name)
         return track_content
 
@@ -357,7 +357,7 @@ class TrackPart:
 
         data = np.column_stack((np.arange(1, len(X) + 1), X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz))
         file_name = "loopCG"
-        CSV.write_csv(data, pts, r, file_name)
+        file_utils.write_csv(data, pts, r, file_name)
         track_content = (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name)
         return track_content
 
@@ -373,7 +373,7 @@ class TrackPart:
     # Cobra Roll track part (done)
     @staticmethod
     def cobrarollCG_func(h):
-        data = CSV.read_csv("flashbackcobraroll.csv")
+        data = file_utils.read_csv("flashbackcobraroll.csv")
         cobraroll = data.copy()
         # Scales the track based on your input height
         cobraroll[:, 1:4] = cobraroll[:, 1:4] * h / np.max(data[:, 2])
@@ -385,7 +385,7 @@ class TrackPart:
 
         pts = len(cobraroll)
         file_name = "cobrarollCG"
-        CSV.write_csv(cobraroll, pts, h, file_name)
+        file_utils.write_csv(cobraroll, pts, h, file_name)
         track_content = (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name)
         return track_content
 
@@ -482,7 +482,7 @@ class TrackPart:
 
         data = np.column_stack((np.arange(1, pts+1), X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz))
         file_name = "helix"
-        CSV.write_csv(data, pts, h, file_name)
+        file_utils.write_csv(data, pts, h, file_name)
         track_content = X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name
         return track_content
     
@@ -577,7 +577,7 @@ class TrackPart:
 
         data = np.column_stack((np.arange(1, pts+1), X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz))
         file_name = "horseshoe"
-        CSV.write_csv(data, pts, h, file_name)
+        file_utils.write_csv(data, pts, h, file_name)
         track_content = X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name
         return track_content
 
@@ -607,7 +607,7 @@ class TrackPart:
             ))
         
         file_name = "break"
-        CSV.write_csv(data, pts, L, file_name)
+        file_utils.write_csv(data, pts, L, file_name)
         track_content = (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name)
         return track_content
 
@@ -657,7 +657,7 @@ class TrackPart:
 
         data = np.column_stack((np.arange(1, pts + 1), X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz))
         file_name = "rollup"
-        CSV.write_csv(data, pts, h, file_name)
+        file_utils.write_csv(data, pts, h, file_name)
         track_content = (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name)
         return track_content
 
@@ -678,7 +678,6 @@ class TrackPart:
             return None
         
         track_data = {}
-
         for part in parts:
             section_name = part["section"]
             section_type = part["type"]
@@ -857,10 +856,10 @@ class TrackPart:
             temp = X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz
             X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz = TrackPart.add_loop_back(temp)
 
-        # === Combine all the data into a single array and write to CSV ===
+        # === Combine all the data into a single array and write to file_utils ===
         pts = len(X)
         data = np.column_stack((np.arange(1, pts+1), X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz))
-        CSV.csv_noLimits_format(data, pts, 0, f"Complete_Coaster/{coaster_name}")
+        file_utils.csv_noLimits_format(data, pts, 0, f"Complete_Coaster/{coaster_name}")
 
         # === Data for SolidWorks ===
         # Clean up the data so that its viable to be used by SolidWorks for 3D printing
@@ -925,20 +924,20 @@ class TrackPart:
         # Start and end
         x_start, y_start, z_start = X[0], Y[0], Z[0]
         x_end, y_end, z_end = X[-1], Y[-1], Z[-1]
-
+        
         station_length = 5
         n_straight = 30
         n_arc = 80
 
-        # Connector should stay on ground/elevation level
-        y_ground = 0
+        total_connector_points = n_straight + n_arc + n_straight
+
+        Yc = np.linspace(y_end, y_start, total_connector_points)
 
         # Extend farther in negative X direction before turning
         x_ext = min(x_end, x_start) - station_length
 
         # Straight extension from track end
         x_a = np.linspace(x_end, x_ext, n_straight)
-        y_a = np.full_like(x_a, y_ground)
         z_a = np.full_like(x_a, z_end)
 
         # Semicircle in X-Z floor plane
@@ -951,16 +950,13 @@ class TrackPart:
         bulge_sign = -1
 
         x_b = x_ext + bulge_sign * radius * np.cos(theta)
-        y_b = np.full_like(x_b, y_ground)
         z_b = z_mid + radius * np.sin(theta)
 
         # Straight segment back to station/start
         x_c = np.linspace(x_ext, x_start, n_straight)
-        y_c = np.full_like(x_c, y_ground)
         z_c = np.full_like(x_c, z_start)
 
         Xc = np.concatenate([x_a, x_b, x_c])
-        Yc = np.concatenate([y_a, y_b, y_c])
         Zc = np.concatenate([z_a, z_b, z_c])
 
         # Simple connector vectors
@@ -1118,7 +1114,7 @@ class TrackPhysics:
     
 
 if __name__ == "__main__":
-    (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name) = TrackPart.helix_func(11)
+    (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name) = TrackPart.horseshoe_func(50)
 
     # y_max = np.argmax(Y)
     # x_max = np.argmax(X)

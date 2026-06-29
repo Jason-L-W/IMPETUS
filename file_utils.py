@@ -72,267 +72,279 @@ def write_csv(data, pts, prop, elementname):
 #                           Generate .svg files
 # ========================================================================
 def export_layouts(track_data, xy_composition, track_plots):
-        X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name = track_data
-        font_size, cushion = 8, 5
+    X, Y, Z, *unused_data = track_data
+    font_size, cushion = 8, 5
 
-        x_min_top, x_max_top = np.min(X), np.max(X)
-        z_min_top, z_max_top = np.min(Z), np.max(Z)
-        top_view_x_span = x_max_top - x_min_top
-        top_view_y_span = z_max_top - z_min_top
+    x_min_top, x_max_top = np.min(X), np.max(X)
+    z_min_top, z_max_top = np.min(Z), np.max(Z)
+    top_view_x_span = x_max_top - x_min_top
+    top_view_y_span = z_max_top - z_min_top
 
-        section_colors = {
-            "sec_1": "#1f77b4",
-            "sec_2": "#ff7f0e",
-            "sec_3": "#2ca02c",
-            "sec_4": "#c13017",
-            "sec_5": "#1725c1"
+    # Used to find the boundaries of each segment
+    segment_boundaries = calculate_segment_boundaries(xy_composition)
+
+    # Build the combined subplots matrix
+    fig, axes = plt.subplots(4, 1, figsize=(24, 48))
+    combined_configs = [
+        {"title": "Whole Track Top View", "type": "top"},
+        {"title": "Section 1-2",           "type": "sec_12"},
+        {"title": "Section 3",             "type": "sec_3"},
+        {"title": "Section 4-5",           "type": "sec_45"}
+    ]
+    
+    # Exports a
+    combined_view(axes, combined_configs, xy_composition, segment_boundaries, X, Z)
+
+    # 3. Export standalone views with temporary context decorations
+    export_individual_views(track_plots, segment_boundaries, font_size)
+
+    # 4. Format combined axes, split if necessary, and save print layout components
+    export_printed_pieces(axes, combined_configs, xy_composition, X, Z, cushion, top_view_y_span, x_min_top, x_max_top, z_min_top, z_max_top)
+
+    # Final combined save
+    fig.subplots_adjust(left=1.0/24.0, right=1.0-(1.0/24.0), bottom=1.0/12.0, top=1.0-(1.0/12.0))
+    fig.savefig("Images/combined_track_views.svg", dpi=300)
+    # plt.close(fig)
+
+
+# === Finds the segment boundaries
+def calculate_segment_boundaries(xy_composition):
+    segment_boundaries = {}
+    current_horizontal_offset = 0
+    
+    # Find the start and end of each track segment
+    for idx, segment in enumerate(xy_composition):
+        local_horizontal = segment["XY"]
+        global_2d_horizontal = local_horizontal + current_horizontal_offset
+        segment_boundaries[idx] = {
+            "start_x": global_2d_horizontal[0],
+            "end_x": global_2d_horizontal[-1],
         }
+        current_horizontal_offset = global_2d_horizontal[-1]
+    return segment_boundaries
 
-        segment_boundaries = {}
-        current_horizontal_offset = 0
-        for idx, segment in enumerate(xy_composition):
-            local_horizontal = segment["XY"]
-            global_2d_horizontal = local_horizontal + current_horizontal_offset
-            segment_boundaries[idx] = {
-                "start_x": global_2d_horizontal[0],
-                "end_x": global_2d_horizontal[-1],
-            }
-            current_horizontal_offset = global_2d_horizontal[-1]
+# === Display the top view and all sideview compoenents to scale with the top view ===
+def combined_view(axes, combined_configs, xy_composition, segment_boundaries, X, Z):
+    section_colors = {
+        "sec_1": "#1f77b4",
+        "sec_2": "#ff7f0e",
+        "sec_3": "#2ca02c", 
+        "sec_4": "#c13017",
+        "sec_5": "#1725c1"
+    }
+    
+    axes[0].plot(0, 0, color='black', marker='o', markersize=6, zorder=5)
+    current_horizontal_offset = 0
+    array_idx_start = 0
 
-        fig, axes = plt.subplots(4, 1, figsize=(24, 48))
-        combined_configs = [
-            {"title": "Whole Track Top View", "type": "top"},
-            {"title": "Section 1-2",           "type": "sec_12"},
-            {"title": "Section 3",             "type": "sec_3"},
-            {"title": "Section 4-5",           "type": "sec_45"}
-        ]
-                
-        axes[0].plot(0, 0, color='black', marker='o', markersize=6, zorder=5)
+    for idx, segment in enumerate(xy_composition):
+        local_horizontal = segment["XY"]
+        Z_elevation = segment["Z"]
+        global_2d_horizontal = local_horizontal + current_horizontal_offset
+        segment_color = section_colors.get(f"sec_{idx+1}", "gray")
+        array_idx_end = array_idx_start + len(local_horizontal)
+        
+        # Plot top view
+        axes[0].plot(X[array_idx_start:array_idx_end], Z[array_idx_start:array_idx_end], color=segment_color, linewidth=2)
+        if idx < len(xy_composition) - 1:
+            transition_idx = min(array_idx_end - 1, len(X) - 1)
+            axes[0].plot(X[transition_idx], Z[transition_idx], color='black', marker='o', markersize=6, zorder=5)
 
-        current_horizontal_offset = 0
-        array_idx_start = 0
-        for idx, segment in enumerate(xy_composition):
-            local_horizontal = segment["XY"]
-            Z_elevation = segment["Z"]
-            global_2d_horizontal = local_horizontal + current_horizontal_offset
-            segment_color = section_colors.get(f"sec_{idx+1}", "gray")
-
-            segment_len = len(local_horizontal)
-            array_idx_end = array_idx_start + segment_len
-            
-            # Top View row
-            axes[0].plot(X[array_idx_start:array_idx_end], Z[array_idx_start:array_idx_end], color=segment_color, linewidth=2)
-            if idx < len(xy_composition) - 1:
-                transition_idx = min(array_idx_end - 1, len(X) - 1)
-                axes[0].plot(X[transition_idx], Z[transition_idx], color='black', marker='o', markersize=6, zorder=5)
-
-            # Side View Rows
-            for ax_idx, config in enumerate(combined_configs[1:], start=1):
-                plot_type = config["type"]
-                is_in_this_row = (
-                    (plot_type == "sec_12" and idx in (0, 1)) or
-                    (plot_type == "sec_3"  and idx == 2) or
-                    (plot_type == "sec_45" and idx in (3, 4))
-                )
-                if is_in_this_row:
-                    row_start_offset = segment_boundaries[0]["start_x"] if idx in (0, 1) else (
+        # Plot side views
+        for ax_idx, config in enumerate(combined_configs[1:], start=1):
+            plot_type = config["type"]
+            is_in_this_row = (
+                (plot_type == "sec_12" and idx in (0, 1)) or
+                (plot_type == "sec_3"  and idx == 2) or
+                (plot_type == "sec_45" and idx in (3, 4))
+            )
+            if is_in_this_row:
+                row_start_offset = (segment_boundaries[0]["start_x"] if idx in (0, 1) else 
                                     segment_boundaries[2]["start_x"] if idx == 2 else 
                                     segment_boundaries[3]["start_x"])
-                    
-                    axes[ax_idx].plot(global_2d_horizontal - row_start_offset, Z_elevation, color=segment_color, linewidth=2)
+                axes[ax_idx].plot(global_2d_horizontal - row_start_offset, Z_elevation, color=segment_color, linewidth=2)
 
-            array_idx_start = array_idx_end - 1
-            current_horizontal_offset = global_2d_horizontal[-1]
+        array_idx_start = array_idx_end - 1
+        current_horizontal_offset = global_2d_horizontal[-1]
 
-        view_configs = [
+
+def export_individual_views(track_plots, segment_boundaries, font_size):
+    """Decorates, saves, and reverts isolated view plots from track_plots dict."""
+    view_configs = [
         ("whole_track_topview",  "Whole Track Topview"),
         ("whole_track_sideview", "Whole Track Sideview"),
         ("section_12",           "Section 1-2"),
         ("section_3",            "Section 3"),
         ("section_45",           "Section 4-5")
-        ]
+    ]
 
-        for key, title in view_configs:
-            ax = track_plots[key]["ax"]
-            filename = f"{title.lower().replace(' ', '_')}.svg"
-            temp_elements = []
+    for key, title in view_configs:
+        if key not in track_plots:
+            continue
+            
+        ax = track_plots[key]["ax"]
+        filename = f"{title.lower().replace(' ', '_')}.svg"
+        temp_elements = []
 
-            # Diagram markers injection unique to individual whole sideview file
-            if key == "whole_track_sideview":
-                y_min, y_max = ax.get_ylim()
-                padding = (y_max - y_min) * 0.8
-                new_y_min = y_min - padding
-                ax.set_ylim(bottom=new_y_min)
+        # If its the whole track sideview, plot with guidelines below the track
+        if key == "whole_track_sideview":
+            y_min, y_max = ax.get_ylim()
+            padding = (y_max - y_min) * 0.8
+            new_y_min = y_min - padding
+            ax.set_ylim(bottom=new_y_min)
 
-                canvas_floor_y = new_y_min
-                upper_hline_y = new_y_min + (padding * 0.85)
-                lower_hline_y = new_y_min + (padding * 0.35)
-                label_y = new_y_min + (padding * 0.60)
+            canvas_floor_y = new_y_min
+            upper_hline_y = new_y_min + (padding * 0.85)
+            lower_hline_y = new_y_min + (padding * 0.35)
+            label_y = new_y_min + (padding * 0.60)
 
-                global_start_x = segment_boundaries[0]["start_x"]
-                global_end_x = segment_boundaries[max(segment_boundaries.keys())]["end_x"]
+            global_start_x = segment_boundaries[0]["start_x"]
+            global_end_x = segment_boundaries[max(segment_boundaries.keys())]["end_x"]
 
-                # Upper/Lower Horizontal Line
-                temp_elements.append(ax.plot([global_start_x, global_end_x], [upper_hline_y, upper_hline_y], color='red', linestyle='-', linewidth=0.6, zorder=1)[0])
-                temp_elements.append(ax.plot([global_start_x, global_end_x], [lower_hline_y, lower_hline_y], color='blue', linestyle='-', linewidth=0.6, zorder=1)[0])
-                
-                # First/Last Vertical Line
-                temp_elements.append(ax.plot([global_start_x, global_start_x], [canvas_floor_y, upper_hline_y], color='gray', linestyle='-', linewidth=0.6, zorder=1)[0])
-                temp_elements.append(ax.plot([global_end_x, global_end_x], [canvas_floor_y, upper_hline_y], color='gray', linestyle='-', linewidth=0.6, zorder=1)[0])
-                
+            temp_elements.append(ax.plot([global_start_x, global_end_x], [upper_hline_y, upper_hline_y], color='red', linestyle='-', linewidth=0.6, zorder=1)[0])
+            temp_elements.append(ax.plot([global_start_x, global_end_x], [lower_hline_y, lower_hline_y], color='blue', linestyle='-', linewidth=0.6, zorder=1)[0])
+            temp_elements.append(ax.plot([global_start_x, global_start_x], [canvas_floor_y, upper_hline_y], color='gray', linestyle='-', linewidth=0.6, zorder=1)[0])
+            temp_elements.append(ax.plot([global_end_x, global_end_x], [canvas_floor_y, upper_hline_y], color='gray', linestyle='-', linewidth=0.6, zorder=1)[0])
 
-                for idx, bounds in segment_boundaries.items():
-                    mid_x_loc = (bounds["start_x"] + bounds["end_x"]) / 2.0
-                    section_name = ax.text(x=mid_x_loc, y=label_y, s=f"Section {idx+1}", fontsize=font_size * 0.6, color='black', ha='center', va='center')
-                    temp_elements.append(section_name)
+            for s_idx, bounds in segment_boundaries.items():
+                mid_x_loc = (bounds["start_x"] + bounds["end_x"]) / 2.0
+                section_name = ax.text(x=mid_x_loc, y=label_y, s=f"Section {s_idx+1}", fontsize=font_size * 0.6, color='black', ha='center', va='center')
+                temp_elements.append(section_name)
 
-                    if idx < len(segment_boundaries) - 1:
-                        sub_vline, = ax.plot([bounds["end_x"], bounds["end_x"]], [canvas_floor_y, lower_hline_y], color='gray', linestyle='-', linewidth=0.6, zorder=2)
-                        temp_elements.append(sub_vline)
+                if s_idx < len(segment_boundaries) - 1:
+                    sub_vline, = ax.plot([bounds["end_x"], bounds["end_x"]], [canvas_floor_y, lower_hline_y], color='gray', linestyle='-', linewidth=0.6, zorder=2)
+                    temp_elements.append(sub_vline)
 
-            ax.axis('off')
-            ax.set_title(title, fontsize=font_size)
-            ax.figure.savefig(f"Images/{filename}", dpi=300)
-            ax.set_title(title, fontsize=font_size)
-            ax.axis('on')
+        ax.axis('off')
+        ax.set_title(title, fontsize=font_size)
+        ax.figure.savefig(f"Images/{filename}", dpi=300)
+        ax.axis('on')
 
-            # Clean artifacts
-            for element in temp_elements:
-                element.remove()
-            if key == "whole_track_sideview":
+        # Clean up temporary layout lines
+        for element in temp_elements:
+            element.remove()
+        if key == "whole_track_sideview":
+            try:
                 ax.set_ylim(y_min, y_max)
+            except NameError:
+                pass
 
-        # B. Format and save the multi-row combined image configuration
-        for ax_idx, config in enumerate(combined_configs):
-            ax = axes[ax_idx]
-            plot_type = config["type"]
-            x_pattern, y_pattern = [], []
 
-            if plot_type == "top":
-                ax.plot(x_min_top, 0, 'go', markersize=8)
-                ax.plot(x_max_top, 0, 'go', markersize=8)
-                ax.set_xlim(x_min_top - cushion, x_max_top + cushion)
-                ax.set_ylim(z_min_top - cushion, z_max_top + cushion)
-            else:
-                # Dynamically evaluate bounding constraints on drawn lines inside this specific subplot row
-                lines = ax.get_lines()
-                if lines:
-                    local_y_all = [np.min(l.get_ydata()) for l in lines] + [np.max(l.get_ydata()) for l in lines]
-                    y_base = min(local_y_all)
-                else:
-                    y_base = 0
+def export_printed_pieces(axes, combined_configs, xy_composition, X, Z, cushion, top_view_y_span, x_min_top, x_max_top, z_min_top, z_max_top):
+    """Processes scaling, adds tooth baselines, and cuts ultra-wide plots into printable chunks."""
+    for ax_idx, config in enumerate(combined_configs):
+        ax = axes[ax_idx]
+        plot_type = config["type"]
+        
+        if plot_type == "top":
+            ax.plot(x_min_top, 0, 'go', markersize=8)
+            ax.plot(x_max_top, 0, 'go', markersize=8)
+            ax.set_xlim(x_min_top - cushion, x_max_top + cushion)
+            ax.set_ylim(z_min_top - cushion, z_max_top + cushion)
+        else:
+            lines = ax.get_lines()
+            y_base = min([np.min(l.get_ydata()) for l in lines] + [np.max(l.get_ydata()) for l in lines]) if lines else 0
+            ax.set_xlim(x_min_top - cushion, x_max_top + cushion)
+            ax.set_ylim(y_base - cushion, y_base + top_view_y_span + cushion)
+        
+        ax.set_aspect('equal', adjustable='box')
+        ax.axis('off')
 
-                ax.set_xlim(x_min_top - cushion, x_max_top + cushion)
-                ax.set_ylim(y_base - cushion, y_base + top_view_y_span + cushion)
+        current_xlim = ax.get_xlim()
+        track_x_data, track_y_data = [], []
+        for line in ax.get_lines():
+            track_x_data.extend(line.get_xdata())
+            track_y_data.extend(line.get_ydata())
+        track_x_data, track_y_data = np.array(track_x_data, dtype=float), np.array(track_y_data, dtype=float)
+
+        box_physical_width_inches = 22.0
+        box_data_width = float(current_xlim[1] - current_xlim[0])
+        one_inch_in_data_units = box_data_width / box_physical_width_inches
             
-            ax.set_aspect('equal', adjustable='box')
-            ax.axis('off')
+        t_min_x = float(np.min(track_x_data)) if track_x_data.size > 0 else 0.0
+        t_max_x = float(np.max(track_x_data)) if track_x_data.size > 0 else 1.0
+        actual_track_span = t_max_x - t_min_x
+
+        should_split = (plot_type != "top") and (actual_track_span > (box_physical_width_inches * one_inch_in_data_units))
+        split_passes = ["piece_A", "piece_B"] if should_split else ["full"]
+        midpoint_x = (t_min_x + t_max_x) / 2.0
+        
+        for pass_type in split_passes:
             single_fig = plt.figure(figsize=(24, 12))
-
-            # 1-inch boundaries
-            s_left, s_bottom = 1.0 / 24.0, 1.0 / 12.0
-            s_width, s_height = (24.0 - 2.0) / 24.0, (12.0 - 2.0) / 12.0
-            single_ax = single_fig.add_axes([s_left, s_bottom, s_width, s_height])
-            
-            # Duplicate the track lines from the current row into this single figure
+            single_ax = single_fig.add_axes([1.0/24.0, 1.0/12.0, (24.0-2.0)/24.0, (12.0-2.0)/12.0])
+        
             for line in ax.get_lines():
-                single_ax.plot(
-                    line.get_xdata(), 
-                    line.get_ydata(), 
-                    color=line.get_color(), 
-                    linewidth=line.get_linewidth()
-                )
+                lx, ly = line.get_xdata(), line.get_ydata()
+                if pass_type == "piece_A":
+                    mask = lx <= midpoint_x
+                    if np.any(mask): single_ax.plot(lx[mask], ly[mask], color=line.get_color(), linewidth=line.get_linewidth())
+                elif pass_type == "piece_B":
+                    mask = lx >= midpoint_x
+                    if np.any(mask): single_ax.plot(lx[mask] - (midpoint_x - t_min_x), ly[mask], color=line.get_color(), linewidth=line.get_linewidth())
+                else:
+                    single_ax.plot(lx, ly, color=line.get_color(), linewidth=line.get_linewidth())
 
             if plot_type == "top":
                 dot_array_idx = 0
-                for idx, segment in enumerate(xy_composition[:-1]):  # Stop before last segment
+                for segment in xy_composition[:-1]:
                     dot_array_idx += len(segment["XY"]) - 1
-                    single_ax.plot(
-                        X[dot_array_idx], Z[dot_array_idx], 
-                        color='black', marker='o', markersize=6, zorder=5
-                    )
+                    single_ax.plot(X[dot_array_idx], Z[dot_array_idx], color='black', marker='o', markersize=6, zorder=5)
 
-            current_xlim, current_ylim = ax.get_xlim(), ax.get_ylim()
-            track_x_data, track_y_data = [], []
-
-            for line in ax.get_lines():
-                track_x_data.extend(line.get_xdata())
-                track_y_data.extend(line.get_ydata())
-            track_x_data, track_y_data = np.array(track_x_data, dtype=float), np.array(track_y_data, dtype=float)
-
-            # For sideviews we create the greek keys below the tracks
+            # Add the greek keys to the sideviews
+            x_pattern, y_pattern = [], []
             if plot_type != "top":
-                box_physical_width_inches = 22.0
-                box_data_width = float(current_xlim[1] - current_xlim[0])
-                one_inch_in_data_units = box_data_width / box_physical_width_inches
-                
-                # Length and width of the greek keys (Scale can be adjusted - right now its half inch)
                 step_size = 0.5 * one_inch_in_data_units  
                 tooth_height = 0.5 * one_inch_in_data_units
+                lowest_point = float(np.min(track_y_data)) if len(track_y_data) > 0 else 0.0
+                highest_point = float(np.max(track_y_data)) if len(track_y_data) > 0 else 10.0
+                
+                y_baseline = lowest_point - (one_inch_in_data_units * 2.0)
+                y_top_limit = highest_point + (one_inch_in_data_units * 1.5)
 
-                lowest_track_point = float(np.min(track_y_data)) if len(track_y_data) > 0 else 0.0
-                y_baseline = lowest_track_point - (one_inch_in_data_units * 2.0)
+                p_min_x, p_max_x = (t_min_x, midpoint_x) if pass_type == "piece_A" else (t_min_x, t_max_x - (midpoint_x - t_min_x)) if pass_type == "piece_B" else (t_min_x, t_max_x)
 
-                t_min_x, t_max_x = min(track_x_data), max(track_x_data)
-                num_cycles = int((t_max_x - t_min_x) / (step_size * 2)) + 1
-                current_x = t_min_x
 
-                # Creates the patterned greek keys
+                num_cycles = int((p_max_x - p_min_x) / (step_size * 2)) + 1
+                current_x = p_min_x
+
                 x_pattern.append(current_x)
                 y_pattern.append(y_baseline)
                 for _ in range(num_cycles):
                     tooth_top = min(y_baseline + tooth_height, -(one_inch_in_data_units * 0.2))
                     x_pattern.extend([current_x, current_x, current_x + step_size, current_x + step_size, current_x + step_size])
                     y_pattern.extend([tooth_top, y_baseline, y_baseline, y_baseline, tooth_top])
-                    current_x += (step_size * 2) # Step through sequence cycles
-                single_ax.plot(np.array(x_pattern, dtype=float), np.array(y_pattern, dtype=float), color='black', linewidth=1.5, zorder=1)
+                    current_x += (step_size * 2)
+                
+                single_ax.plot(np.array(x_pattern, dtype=float), np.array(y_pattern, dtype=float), color='black', linewidth=1, zorder=1)
+                # Vertical lines are the beginning and end (Used for Cricut)
+                single_ax.plot([p_min_x, p_min_x], [y_baseline, y_top_limit], color='black', linewidth=1)
+                single_ax.plot([p_max_x, p_max_x], [y_baseline, y_top_limit], color='black', linewidth=1)
 
-                # Creates vertical lines at the beginning and end of the segment
-                single_ax.plot([t_min_x, t_min_x], [5, y_baseline], color='black', linewidth=1.5)
-                single_ax.plot([t_max_x, t_max_x], [5, y_baseline], color='black', linewidth=1.5)
+                if pass_type == "piece_A":
+                    single_ax.plot([midpoint_x, midpoint_x], [y_baseline, y_top_limit], color='black', linewidth=1)
+                elif pass_type == "piece_B":
+                    single_ax.plot([t_min_x, t_min_x], [y_baseline, y_top_limit], color='black', linewidth=1)
 
-                single_ax.set_ylim(y_baseline - (one_inch_in_data_units * 0.5), current_ylim[1])
+                single_ax.set_ylim(y_baseline - (one_inch_in_data_units * 0.5), y_top_limit)
             else:
                 single_ax.set_ylim(ax.get_ylim())
 
-            if track_x_data.size > 0:
-                data_min_x = np.min(track_x_data)
-                data_max_x = np.max(track_x_data)
+            data_min_x = t_min_x if pass_type in ["piece_A", "piece_B"] else np.min(track_x_data) if track_x_data.size > 0 else current_xlim[0]
+            data_max_x = midpoint_x if pass_type == "piece_A" else t_max_x - (midpoint_x - t_min_x) if pass_type == "piece_B" else np.max(track_x_data) if track_x_data.size > 0 else current_xlim[1]
+
+            if plot_type != "top" and x_pattern:
+                data_min_x, data_max_x = min(data_min_x, np.min(x_pattern)), max(data_max_x, np.max(x_pattern))
                 
-                # Account for the greek keys if this is a sideview
-                if plot_type != "top" and x_pattern:
-                    data_min_x = min(data_min_x, np.min(x_pattern))
-                    data_max_x = max(data_max_x, np.max(x_pattern))
-                    
-                data_mid_x = (data_min_x + data_max_x) / 2.0
-                half_width = (current_xlim[1] - current_xlim[0]) / 2.0
-                single_ax.set_xlim(data_mid_x - half_width, data_mid_x + half_width)
-            else:
-                single_ax.set_xlim(ax.get_xlim())
-            
+            data_mid_x = (data_min_x + data_max_x) / 2.0
+            half_width = (current_xlim[1] - current_xlim[0]) / 2.0
+            single_ax.set_xlim(data_mid_x - half_width, data_mid_x + half_width)
             single_ax.set_aspect('equal', adjustable='box')
             single_ax.axis('off')
             
-            # Export as standalone file
             safe_title = config["title"].lower().replace(' ', '_').replace('-', '_')
-            single_fig.savefig(f"Images/to_print_{safe_title}.svg", dpi=300, transparent=True, facecolor='none', pad_inches=0)
-            plt.close(single_fig) # Free up system memory instantly
-
-        left_fraction   = 1.0 / 24.0          # Approx 0.0417
-        right_fraction  = 1.0 - (1.0 / 24.0)  # Approx 0.9583
-        bottom_fraction = 1.0 / 12.0          # Approx 0.0833
-        top_fraction    = 1.0 - (1.0 / 12.0)  # Approx 0.9167
-
-        fig.subplots_adjust(
-            left=left_fraction, 
-            right=right_fraction, 
-            bottom=bottom_fraction, 
-            top=top_fraction,
-        )
-
-        fig.savefig("Images/combined_track_views.svg", dpi=300)
-        plt.close(fig)
-
+            suffix = f"_{pass_type}" if should_split else ""
+            single_fig.savefig(f"Images/to_print_{safe_title}{suffix}.svg", dpi=300, transparent=True, facecolor='none', pad_inches=0)
+            plt.close(single_fig)
 
 # ========================================================================
 #                       NoLimits 2 Spline Format

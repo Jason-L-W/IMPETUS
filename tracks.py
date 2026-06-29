@@ -2,6 +2,16 @@ import numpy as np
 import file_utils
 import matplotlib.pyplot as plt
 
+
+# List of all the checks for each track type
+# ========================================================================
+VALLEY_CHECKS = ["Loop", "Camelback", "Corkscrew", "Cobra Roll"]
+INVERSION_CHECKS = ["Loop", "Corkscrew", "Cobra Roll"]
+PEAK_CHECKS = ["Camelback"]
+LATERAL_CHECKS = ["Horseshoe", "Helix"]
+# ========================================================================
+INVERT_TRACKS = ["Thrills 2", "Ends"]   # Inverted tracks
+
 # This class is used to store all track part functions
 # For all tracks, friction is negligible.
 class TrackPart:
@@ -58,11 +68,11 @@ class TrackPart:
         file_utils.write_csv(data, pts, L, file_name)
         track_content = (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name)
         
-        # v_exit = sqrt(2 * 2.5g * L) where a is the acceleration and L is the length of the track
-        v_exit = np.sqrt(2 * 2.5 * 9.8 * L) # Assuming a constant acceleration of 2.5g for the launcher
+        # v_exit = sqrt(2 * 1.5g * L) where a is the acceleration and L is the length of the track
+        v_exit = np.sqrt(2 * 1.5 * 9.8 * L) # Assuming a constant acceleration of 1.5g for the launcher
         return track_content, v_exit
     
-    # Lifthill track part (done)
+    # Lifthill track part (checked)
     @staticmethod
     def lifthill_func(h):
         # h is the max height
@@ -82,6 +92,7 @@ class TrackPart:
         file_utils.write_csv(lifthill, pts, h, file_name)
         track_content = (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name)
         max_y = np.max(Y)
+        print(max_y)
         v_exit = np.sqrt(2 * 9.8 * max_y)
         return track_content, v_exit
 
@@ -290,12 +301,12 @@ class TrackPart:
         track_content = (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name)
         return track_content
 
-    # Loop with constant G-force (done)
-    # This also needs to return the height, r1, and r2 of the loop
+    # Loop with constant G-force (checked)
     @staticmethod
-    def loopCG_func(r, ngs = 4):
+    def loopCG_func(r):
+        ngs = 4
         g = 9.8
-        H = ((ngs - 1) * r) / 2
+        H = 2 * r
         dt = 0.01
 
         # Initialize conditions
@@ -759,22 +770,22 @@ class TrackPart:
 
             # === After finding the V's and R's we do the checks ===
             # Valley Checks
-            if section_type in ("Loop", "Camelback", "Corkscrew", "Cobra Roll"):
+            if section_type in VALLEY_CHECKS:
                 val_passed, _ = TrackPhysics.valley_check(v_bot, r_bot)
                 track_data[section_name]["checks"]["valley_check"] = val_passed
 
             # Inversion Checks
-            if section_type in ("Loop", "Corkscrew", "Cobra Roll"):
+            if section_type in INVERSION_CHECKS:
                 inv_passed, _ = TrackPhysics.inversion_check(v_top, r_top)
                 track_data[section_name]["checks"]["inversion_check"] = inv_passed
 
             # Peak Checks
-            elif section_type == "Camelback":
+            elif section_type in PEAK_CHECKS:
                 peak_passed, _ = TrackPhysics.peak_check(v_top, r_top)
                 track_data[section_name]["checks"]["peak_check"] = peak_passed
 
             # Lateral Checks
-            elif section_type in ("Horseshoe", "Helix"):
+            elif section_type in LATERAL_CHECKS:
                 # Extract normal tracking banking profile vector components
                 if section_type == "Horseshoe":
                     nx, ny, nz = Nx2[peak_idx], Ny2[peak_idx], Nz2[peak_idx]
@@ -782,7 +793,7 @@ class TrackPart:
                     theta_rad = np.arccos(nz / mag) if mag > 1e-5 else 0.0
 
                     deg_banking = np.degrees(np.arccos(np.clip(ny / (mag if mag > 1e-5 else 1.0), -1.0, 1.0)))
-                    track_data[section_name]["stats"]["v_top"] = deg_banking
+                    track_data[section_name]["stats"]["deg_banking"] = deg_banking
                     
                 elif section_type == "Helix":
                     x_max_val = np.max(X2)
@@ -800,8 +811,8 @@ class TrackPart:
                     mag_b = np.sqrt(nx_b**2 + ny_b**2 + nz_b**2)
                     deg_bot = np.degrees(np.arccos(np.clip(ny_b / (mag_b if mag_b > 1e-5 else 1.0), -1.0, 1.0)))
                     
-                    track_data[section_name]["stats"]["v_top"] = deg_top
-                    track_data[section_name]["stats"]["v_bottom"] = deg_bot
+                    track_data[section_name]["stats"]["deg_top"] = deg_top
+                    track_data[section_name]["stats"]["deg_bottom"] = deg_bot
 
                 lat_passed, _ = TrackPhysics.lateral_check(v_top, r_top, theta_rad)
                 track_data[section_name]["checks"]["lateral_check"] = lat_passed
@@ -819,18 +830,18 @@ class TrackPart:
                 track_data[section_name]["checks"]["brake_check"] = brake_passed
 
             # === After Turns Section Invert Track ===
-            if section_name in ("Thrills 2", "Ends"):
+            if section_name in INVERT_TRACKS:
                 # If the part is a "Thrills 2" or "Ends" section, reverse the order of the arrays to ensure smooth connection
-                X2, Y2, Z2 = X2[::-1], Y2, Z2[::-1]
-                Fx2, Fy2, Fz2 = -Fx2[::-1], -Fy2[::-1], -Fz2[::-1]
-                Lx2, Ly2, Lz2 = -Lx2[::-1], -Ly2[::-1], -Lz2[::-1]
-                Nx2, Ny2, Nz2 = Nx2[::-1], Ny2[::-1], Nz2[::-1]
-
                 if section_type == "Rollup":
-                    plt.figure()
-                    plt.plot(X2, Y2, 'b-', label='Track Path')
-                    plt.plot(X2 + Nx2, Y2 + Ny2, 'r-', alpha=0.4, label='Normals')
-                    plt.show()
+                    X2, Y2, Z2 = -X2, Y2, Z2
+                    Fx2, Fy2, Fz2 = -Fx2, Fy2, Fz2
+                    Lx2, Ly2, Lz2 = -Lx2, Ly2, Lz2
+                    Nx2, Ny2, Nz2 = -Nx2, Ny2, Nz2
+                else:
+                    X2, Y2, Z2 = X2[::-1], Y2, Z2[::-1]
+                    Fx2, Fy2, Fz2 = -Fx2[::-1], -Fy2[::-1], -Fz2[::-1]
+                    Lx2, Ly2, Lz2 = -Lx2[::-1], -Ly2[::-1], -Lz2[::-1]
+                    Nx2, Ny2, Nz2 = Nx2[::-1], Ny2[::-1], Nz2[::-1]
 
             # Offset the new part to connect smoothly
             X2 += X[-1] - X2[0]
@@ -1093,35 +1104,40 @@ class TrackPhysics:
 
     @staticmethod
     def rollup_check(v_bot, h):
-        # h > (v_bot^2 / 2g) implies a stall risk
-        max_possible_h = (v_bot**2) / (2 * TrackPhysics.g)
-        if h >= max_possible_h:
-            return False, max_possible_h
-        return True, max_possible_h
+        # h_min = (v_bot^2 / 2g) implies a stall risk
+        
+
+        h_min = (v_bot**2) / (2 * TrackPhysics.g)
+        if h < h_min:
+            return False, h_min
+        return True, h_min
     
     @staticmethod
     def brake_check(v_bot, L):
         # v_max = sqrt(2 * a * L), check if v_bot < v_max
         a_decel = 1.5
         v_max = np.sqrt(2 * a_decel * TrackPhysics.g * L)
-
-        print(f"v_bot: {v_bot}\n")
-        print(f"L: {L} v_max: {v_max}\n")
-
         if v_bot > v_max:
             return False, v_max
         return True, v_max
     
 
 if __name__ == "__main__":
-    (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name) = TrackPart.horseshoe_func(50)
+    (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name) = TrackPart.loopCG_func(32.0)
 
-    # y_max = np.argmax(Y)
-    # x_max = np.argmax(X)
-    # print(f"x:{X[x_max]}\n idx:{y_max} - y:{Y[y_max]}")
     
-    plt.figure()
-    # plt.plot(X[x_max], 0, 'go')
-    plt.plot(X, Z, 'b-', label='Track Path')
-    plt.plot(X + Nx, Z + Nz, 'r-', alpha=0.4, label='Normals')
-    plt.show()
+    print(f"X: {max(X)}")
+    print(f"Y: {max(Y)}")
+
+    # X, Y, Z = X[::-1], Y, Z[::-1]
+    # Fx, Fy, Fz = -Fx[::-1], -Fy[::-1], -Fz[::-1]
+    # Lx, Ly, Lz = -Lx[::-1], -Ly[::-1], -Lz[::-1]
+    # Nx, Ny, Nz = Nx[::-1], Ny, Nz[::-1]
+
+    
+    # plt.figure()
+    # plt.plot(X, Y, 'b-', label='Track Path')
+    # plt.plot(X + Nx, Y + Ny, 'r-', alpha=0.4, label='Normals')
+    # plt.show()
+
+

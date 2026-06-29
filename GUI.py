@@ -278,7 +278,26 @@ class MainWindow(QMainWindow):
 
         # Inital Tab Widget (Hidden until assembly is complete)
         self.visual_tab_widget = QTabWidget()
-        self.visual_tab_widget.setStyleSheet("background-color: white; color: blue; font-size: 12px; font-weight: bold;")
+        self.visual_tab_widget.setStyleSheet("""
+            background-color: white; color: blue; font-size: 12px; font-weight: bold;
+            
+            QTabBar::tab {
+                background-color: white;
+                color: #0000cc;        /* Vibrant blue text */
+                font-size: 12px;
+                font-weight: bold;
+                padding: 6px 14px;         
+                border: 1px solid #dcdcdc; 
+                border-top-left-radius: 4px;
+                border-top-right-radius: 4px;
+                margin-right: -1px;
+            }
+            QTabBar::tab:selected {
+                background-color: white;
+                color: #0000ff;
+                border-bottom: 1px solid white;
+            }
+        """)
         self.visual_tab_widget.hide()
         self.visual_constent_layout.addWidget(self.visual_tab_widget)
 
@@ -459,10 +478,9 @@ class MainWindow(QMainWindow):
         length_input = QLineEdit()
         length_input.setPlaceholderText("Track Length (Meters)")
         
-
         # Setup the Slider
         length_slider = RangeIndicatorSlider(Qt.Orientation.Horizontal)
-        length_slider.setRange(1, 100)
+        length_slider.setRange(1, 50)
 
         # ======= Test Value =======
         length_input.setText("11")
@@ -545,11 +563,11 @@ class MainWindow(QMainWindow):
                     if stats.get('deg_banking') is not None:
                         section_data["Degrees Banking"] = f"{stats['deg_banking']:.2f}°"
                     
-                    if stats.get('deg_banking_top') is not None:
-                        section_data["Degrees Top (X max)"] = f"{stats['deg_banking_top']:.2f}°"
+                    if stats.get('deg_top') is not None:
+                        section_data["Degrees Top"] = f"{stats['deg_top']:.2f}°"
                     
-                    if stats.get('deg_banking_bottom') is not None:
-                        section_data["Degrees Bottom (X max)"] = f"{stats['deg_banking_bottom']:.2f}°"
+                    if stats.get('deg_bottom') is not None:
+                        section_data["Degrees Bottom"] = f"{stats['deg_bottom']:.2f}°"
 
                 # if section_name == "Ends" and :
                     

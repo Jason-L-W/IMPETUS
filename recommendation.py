@@ -22,7 +22,7 @@ class EnergyRecommendation:
         elif start_type == "Lift Hill":
             v_exit = np.sqrt(2 * cls.g * start_value)
         elif start_type == "Rollback":
-            v_exit = np.sqrt(2 * cls.g * start_value)
+            v_exit = np.sqrt(2 * 1.5 * cls.g * start_value)
             
         total_energy_height = (v_exit ** 2) / (2 * cls.g)
         

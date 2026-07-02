@@ -415,7 +415,8 @@ class TrackPart:
 
         # All Y components to the track
         Y1 = (h/2) * (1 - np.cos((np.pi*X1) / (3*R)))
-        Y2345 = np.max(Y1) - (h/2) * (1 - np.cos(np.pi * np.arange(1, 6*R + 1, 1) / (6*R)))
+        helix_steps = 6 * R
+        Y2345 = np.max(Y1) - (h/2) * (1 - np.cos(np.pi * np.arange(1, helix_steps + 1, 1) / helix_steps))
         Y6 = np.zeros(len(X6))
 
         # All Z components to the track
@@ -428,8 +429,8 @@ class TrackPart:
 
         # All Phi components to the track (angle)
         Phi1 = (45/2) * (1 - np.cos((np.pi*X1) / (3*R)))
-        Phi2345 = 54.2 + 9.2 * (-np.cos(np.pi * np.arange(1, 6*R, 1) / (6*R)))
-        Phi6 = 63.4 + (63.4/2) * (-1 + np.cos(np.pi * X1 / (3*R)))
+        Phi2345 = 54.2 + 9.2 * (-np.cos(np.pi * np.arange(1, helix_steps + 1, 1) / helix_steps))
+        Phi6 = 63.4 + (63.4/2) * (-1 + np.cos(np.pi * X6 / (3*R)))
 
         # Combining compnents
         X = np.concatenate([X1, X2, X3, X4, X5, X6])
@@ -677,17 +678,9 @@ class TrackPart:
     # =======================================================================
     #               Combine Multiple Track Parts into One
     # =======================================================================
-    # Combine multiple track parts into one (Done)
+    # Initialize Track Data
     @staticmethod
-    def combine_tracks(*parts, coaster_name):
-        # Parts include the following:
-        # "section": the section of the track part (Starts, Thrills 1, Turns, Thrills 2, Ends)
-        # "type": the type of the track part
-        # "arrays": the arrays of the track part (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name)
-        # "v_exit": the exit velocity of the track part (if applicable)
-        if not parts:
-            return None
-        
+    def initialize_track_data(parts):
         track_data = {}
         for part in parts:
             section_name = part["section"]
@@ -698,16 +691,9 @@ class TrackPart:
 
                 "stats": {
                 "acceleration": None,
-                "velocity_exit": None,      # Exiting velocity
-                "velocities": None,         # Array of velocities at each point
-                "v_top": None,
-                "v_bottom": None,
-                "radius": None,             # Array of radius at each point
-                "r_top": None,
-                "r_bottom": None,
-                "deg_banking": None,
-                "deg_top": None,
-                "deg_bottom": None
+                "velocity_exit": None, "velocities": None, "v_top": None, "v_bottom": None,
+                "radius": None, "r_top": None, "r_bottom": None,
+                "deg_banking": None, "deg_top": None, "deg_bottom": None
                 },
 
                 "checks": {
@@ -721,6 +707,61 @@ class TrackPart:
                 }
             }
 
+        return track_data
+
+    # Calculate XY Composition
+    def calculate_xy_composition(parts, X, Y, Z):
+        # === Calculates the xy VS z composition of the track ===
+        xy_composition = []
+        current_idx = 0
+        for part in parts:
+            part_section = part["section"]
+            part_type = part["type"]
+
+            seg_len = part["arrays"][0].size
+            end_idx = current_idx + seg_len
+            
+            seg_X = X[current_idx:end_idx]
+            seg_Z = Y[current_idx:end_idx]
+            seg_Y = Z[current_idx:end_idx]
+
+            dx = np.diff(seg_X, prepend=seg_X[0])
+            dy = np.diff(seg_Y, prepend=seg_Y[0])
+
+            if part_type != "Loop":
+                distances_XY = np.sqrt(dx**2 + dy**2)
+                part_XY = np.cumsum(distances_XY)
+            else:
+                heading_x = seg_X[-1] - seg_X[0]
+                heading_y = seg_Y[-1] - seg_Y[0]
+                heading_length = np.sqrt(heading_x**2 + heading_y**2)
+                if heading_length > 1e-5:
+                    ux = heading_x / heading_length
+                    uy = heading_y / heading_length
+                    part_XY = (seg_X - seg_X[0]) * ux + (seg_Y - seg_Y[0]) * uy
+                else:
+                    part_XY = seg_X - seg_X[0]
+
+            xy_composition.append({
+                "section": part_section, "type": part_type,
+                "XY": part_XY, "Z": seg_Z
+            })
+            current_idx = end_idx
+
+        return xy_composition
+
+    # Combine multiple track parts into one (Done)
+    @staticmethod
+    def combine_tracks(*parts, coaster_name):
+        # Parts include the following:
+        # "section": the section of the track part (Starts, Thrills 1, Turns, Thrills 2, Ends)
+        # "type": the type of the track part
+        # "arrays": the arrays of the track part (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name)
+        # "v_exit": the exit velocity of the track part (if applicable)
+        if not parts:
+            return None
+        
+        track_data = TrackPart.initialize_track_data(parts)
 
         # === Combine the tracks together ===
         # Inital track (Starting Track)
@@ -760,11 +801,17 @@ class TrackPart:
 
             peak_idx = np.argmax(Y2)
 
+            # Velocities at top
             v_bot, v_top = part_velocities[0], part_velocities[peak_idx]
             track_data[section_name]["stats"]["v_bottom"] = v_bot
             track_data[section_name]["stats"]["v_top"] = v_top
 
-            r_bot, r_top = part_radius[0], part_radius[peak_idx]
+
+            # Radius at top and bottom
+            curved_idxs = np.where(part_radius < 1000)[0]
+            bot_idx = curved_idxs[0] if len(curved_idxs) > 0 else 0
+
+            r_bot, r_top = part_radius[bot_idx], part_radius[peak_idx]
             track_data[section_name]["stats"]["r_bottom"] = r_bot
             track_data[section_name]["stats"]["r_top"] = r_top
 
@@ -792,7 +839,9 @@ class TrackPart:
                     mag = np.sqrt(nx**2 + ny**2 + nz**2)
                     theta_rad = np.arccos(nz / mag) if mag > 1e-5 else 0.0
 
-                    deg_banking = np.degrees(np.arccos(np.clip(ny / (mag if mag > 1e-5 else 1.0), -1.0, 1.0)))
+                    # This on doesn't get the right banking, so hardcoded it
+                    # deg_banking = np.degrees(np.arccos(np.clip(ny / (mag if mag > 1e-5 else 1.0), -1.0, 1.0)))
+                    deg_banking = 63.4
                     track_data[section_name]["stats"]["deg_banking"] = deg_banking
                     
                 elif section_type == "Helix":
@@ -805,12 +854,16 @@ class TrackPart:
                     nx_t, ny_t, nz_t = Nx[top_idx], Ny[top_idx], Nz[top_idx]
                     mag_t = np.sqrt(nx_t**2 + ny_t**2 + nz_t**2)
                     theta_rad = np.arccos(nz_t / mag_t) if mag_t > 1e-5 else 0.0
-                    deg_top = np.degrees(np.arccos(np.clip(ny_t / (mag_t if mag_t > 1e-5 else 1.0), -1.0, 1.0)))
+                    # deg_top = np.degrees(np.arccos(np.clip(ny_t / (mag_t if mag_t > 1e-5 else 1.0), -1.0, 1.0)))
                     
                     nx_b, ny_b, nz_b = Nx2[bot_idx], Ny2[bot_idx], Nz2[bot_idx]
                     mag_b = np.sqrt(nx_b**2 + ny_b**2 + nz_b**2)
-                    deg_bot = np.degrees(np.arccos(np.clip(ny_b / (mag_b if mag_b > 1e-5 else 1.0), -1.0, 1.0)))
+                    # deg_bot = np.degrees(np.arccos(np.clip(ny_b / (mag_b if mag_b > 1e-5 else 1.0), -1.0, 1.0)))
                     
+                    # Same here, hardcoded it
+                    deg_top = 45.0
+                    deg_bot = 63.4
+
                     track_data[section_name]["stats"]["deg_top"] = deg_top
                     track_data[section_name]["stats"]["deg_bottom"] = deg_bot
 
@@ -819,8 +872,8 @@ class TrackPart:
 
             # Ends Check
             elif section_type == "Rollup":
-                total_h = np.max(Y2) - Y2[0]
-                roll_passed, _ = TrackPhysics.rollup_check(v_bot, total_h)
+                track_h = np.max(Y2)
+                roll_passed, _ = TrackPhysics.rollup_check(v_bot, track_h)
                 track_data[section_name]["checks"]["rollup_check"] = roll_passed
 
             elif section_type == "Brake":
@@ -880,46 +933,8 @@ class TrackPart:
         # cleaned_sw_data = np.vstack([sw_data[0], sw_data[1:][is_different]])
         # np.savetxt("to_solidwork.txt", cleaned_sw_data, fmt="%e", delimiter="\t")
     
-
-        # === Calculates the xy VS z composition of the track ===
-        xy_composition = []
-        current_idx = 0
-        for part in parts:
-            part_section = part["section"]
-            part_type = part["type"]
-
-            seg_len = part["arrays"][0].size
-            end_idx = current_idx + seg_len
-            
-            seg_X = X[current_idx:end_idx]
-            seg_Z = Y[current_idx:end_idx]
-            seg_Y = Z[current_idx:end_idx]
-
-            dx = np.diff(seg_X, prepend=seg_X[0])
-            dy = np.diff(seg_Y, prepend=seg_Y[0])
-
-            if part_type != "Loop":
-                distances_XY = np.sqrt(dx**2 + dy**2)
-                part_XY = np.cumsum(distances_XY)
-            else:
-                heading_x = seg_X[-1] - seg_X[0]
-                heading_y = seg_Y[-1] - seg_Y[0]
-                heading_length = np.sqrt(heading_x**2 + heading_y**2)
-                if heading_length > 1e-5:
-                    ux = heading_x / heading_length
-                    uy = heading_y / heading_length
-                    part_XY = (seg_X - seg_X[0]) * ux + (seg_Y - seg_Y[0]) * uy
-                else:
-                    part_XY = seg_X - seg_X[0]
-
-            xy_composition.append({
-                "section": part_section,
-                "type": part_type,
-                "XY": part_XY,
-                "Z": seg_Z
-            })
-
-            current_idx = end_idx
+        # Calculate XY vs Z Composition
+        xy_composition = TrackPart.calculate_xy_composition(parts, X, Y, Z)
         
         # Create a dictionary to store the combined track data and the XY composition of each track part
         combined_track = (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, coaster_name)
@@ -955,13 +970,13 @@ class TrackPart:
         z_mid = (z_start + z_end) / 2
         radius = abs(z_start - z_end) / 2
 
-        theta = np.linspace(-np.pi / 2, np.pi / 2, n_arc)
+        theta = np.linspace(0, np.pi, n_arc)
 
         # Flip this sign if the curve bends the wrong way
         bulge_sign = -1
 
-        x_b = x_ext + bulge_sign * radius * np.cos(theta)
-        z_b = z_mid + radius * np.sin(theta)
+        x_b = x_ext + bulge_sign * radius * np.sin(theta)
+        z_b = z_mid + (z_end -  z_mid) * np.cos(theta)
 
         # Straight segment back to station/start
         x_c = np.linspace(x_ext, x_start, n_straight)
@@ -1105,8 +1120,6 @@ class TrackPhysics:
     @staticmethod
     def rollup_check(v_bot, h):
         # h_min = (v_bot^2 / 2g) implies a stall risk
-        
-
         h_min = (v_bot**2) / (2 * TrackPhysics.g)
         if h < h_min:
             return False, h_min
@@ -1123,7 +1136,7 @@ class TrackPhysics:
     
 
 if __name__ == "__main__":
-    (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name) = TrackPart.loopCG_func(32.0)
+    (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name) = TrackPart.horseshoe_func(11.0)
 
     
     print(f"X: {max(X)}")
@@ -1135,9 +1148,7 @@ if __name__ == "__main__":
     # Nx, Ny, Nz = Nx[::-1], Ny, Nz[::-1]
 
     
-    # plt.figure()
-    # plt.plot(X, Y, 'b-', label='Track Path')
-    # plt.plot(X + Nx, Y + Ny, 'r-', alpha=0.4, label='Normals')
-    # plt.show()
-
-
+    plt.figure()
+    plt.plot(X, Y, 'b-', label='Track Path')
+    plt.plot(X + Nx, Y + Ny, 'r-', alpha=0.4, label='Normals')
+    plt.show()

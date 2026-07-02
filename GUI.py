@@ -27,6 +27,23 @@ THRILLS = ["Loop", "Camelback", "Corkscrew"]                        # Defines th
 TURNS = ["Cobra Roll", "Horseshoe", "Helix"]                        # Defines the turn track types
 ENDS = ["Brake", "Rollup"]                                          # Defines the ending track types
 ALL_TRACKS = STARTS + THRILLS + TURNS + ENDS                        # Defines all track types for validation
+CONTROL = {
+    "Height": {
+        "Lift Hill", "Rollback",
+        "Camelback", "Corkscrew",
+        "Horseshoe", "Cobra Roll", "Helix",
+        "Rollup"
+    },
+
+    "Length": {
+        "Launcher",
+        "Brake"
+    },
+
+    "Radius": {
+        "Loop"
+    }
+}
 # ========================================================================
 
 # Maps track types to their corresponding functions in the tracks module.
@@ -178,7 +195,7 @@ class MainWindow(QMainWindow):
         self.layout = QVBoxLayout(self.main_widget)
 
         # Title
-        title = QLabel("IMPETUS Roller Coaster Track Builder")
+        title = QLabel("IMPETUS Coaster Creation")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title.setStyleSheet("color: white; font-size: 24px; font-weight: bold; padding: 10px; background-color: #34495e; border-radius: 10px;")
         title.setFixedHeight(60)
@@ -422,8 +439,8 @@ class MainWindow(QMainWindow):
     def tabbed_view(self):
         self.assembly_tabs = QTabWidget()
         self.assembly_tabs.setStyleSheet("""
-            QTabWidget::panel {background-color: #ecf0f1; color: black; border-radius: 10px; padding: 10px; font-size: 12px; font-weight: bold;}
-            QTabBar::tab {background-color: #2c3e50; color: black; padding: 8px 16px; border-top-left-radius: 6px; border-top-right-radius: 6px; margin-right: 2px; font-size: 12px; font-weight: bold;}
+            QTabWidget::panel {background-color: white; color: black; border-radius: 10px; padding: 10px; font-size: 12px; font-weight: bold;}
+            QTabBar::tab {background-color: white; color: black; padding: 8px 16px; border-top-left-radius: 6px; border-top-right-radius: 6px; margin-right: 2px; font-size: 12px; font-weight: bold;}
             QTabBar::tab:selected {background-color: #ffffff; color: #2c3e50; font-size: 12px; font-weight: bold;}
         """)
 
@@ -459,9 +476,11 @@ class MainWindow(QMainWindow):
         self.assembly_stack.setCurrentIndex(index)
 
     def track_type(self, section):        
-        # Veritcal Dropdown Widget (Selecting Track Type)
-        col_widget = QWidget()
-        col_layout = QVBoxLayout(col_widget)
+        # Form Widget (Selecting Track Type)
+        form_widget = QWidget()
+        form = QFormLayout(form_widget)
+
+        # col_layout = QVBoxLayout(col_widget)
         track_dropdown = QComboBox()
         track_dropdown.setPlaceholderText("Select Track Type")
 
@@ -476,8 +495,8 @@ class MainWindow(QMainWindow):
         
         # Setup the Length Input Field
         length_input = QLineEdit()
-        length_input.setPlaceholderText("Track Length (Meters)")
-        
+        length_input.setPlaceholderText("Track Value (Meters)")
+
         # Setup the Slider
         length_slider = RangeIndicatorSlider(Qt.Orientation.Horizontal)
         length_slider.setRange(1, 50)
@@ -511,22 +530,33 @@ class MainWindow(QMainWindow):
                         "Invalid Number",
                         f"Track length must be within the range of {length_slider.minimum()} - {length_slider.maximum()}"
                     )
-
             except ValueError:
                 pass
-
         length_input.textChanged.connect(sync_slider_from_text)
 
+        def update_length_label(track_name):
+            param_text = "Value"
+
+            for key, items in CONTROL.items():
+                if track_name in items:
+                    param_text = key
+                    break
+            length_input.setPlaceholderText(f"Track {param_text} (Meters)")
+        track_dropdown.currentTextChanged.connect(update_length_label)
+
+        if track_dropdown.currentText():
+            update_length_label(track_dropdown.currentText())
+
         # Add the widgets to the row layout
-        col_layout.addWidget(track_dropdown)
-        col_layout.addWidget(length_input)
-        col_layout.addWidget(length_slider)
+        form.addRow(track_dropdown)
+        form.addRow(length_input)
+        form.addRow(length_slider)
 
-        col_widget.dropdown = track_dropdown
-        col_widget.input_field = length_input
-        col_widget.slider = length_slider
+        form_widget.dropdown = track_dropdown
+        form_widget.input_field = length_input
+        form_widget.slider = length_slider
 
-        self.tracks[section].append(col_widget)
+        self.tracks[section].append(form_widget)
 
     def show_section_stats(self, section_name):        
         if section_name in self.track_stats and section_name in self.checks:
@@ -548,21 +578,27 @@ class MainWindow(QMainWindow):
                     section_data["Exit Velocity"] = f"{stats['velocity_exit']:.2f} m/s"
 
                 if section_name.startswith("Thrills") or section_name == "Turns":
-                    if "Helix" not in str(stats.get('type', '')):
-                        if stats.get('v_top') is not None:
-                            section_data["Apex (Top) Velocity"] = f"{stats['v_top']:.2f} m/s"
-                        if stats.get('v_bottom') is not None:
-                            section_data["Valley (Bottom) Velocity"] = f"{stats['v_bottom']:.2f} m/s"
-                
-                    if stats.get('r_top') is not None:
-                        section_data["Apex (Top) Radius"] = f"{stats['r_top']:.2f} m"
-                    if stats.get('r_bottom') is not None:
-                        section_data["Valley (Bottom) Radius"] = f"{stats['r_bottom']:.2f} m"
+                    track_type = str(stats.get('type', ''))
 
+                    if stats.get('v_top') is not None:
+                            section_data["Apex (Top) Velocity"] = f"{stats['v_top']:.2f} m/s"
+                    if stats.get('v_bottom') is not None:
+                        section_data["Valley (Bottom) Velocity"] = f"{stats['v_bottom']:.2f} m/s"
+
+
+                    if track_type in ["Horseshoe", "Helix"]:
+                        if stats.get('r_bottom') is not None:
+                            section_data["Radius"] = f"{stats['r_bottom']:.2f} m"
+                    else:
+                        if stats.get('r_top') is not None:
+                            section_data["Apex (Top) Radius"] = f"{stats['r_top']:.2f} m"
+                        if stats.get('r_bottom') is not None:
+                            section_data["Valley (Bottom) Radius"] = f"{stats['r_bottom']:.2f} m"
+    
 
                     if stats.get('deg_banking') is not None:
                         section_data["Degrees Banking"] = f"{stats['deg_banking']:.2f}°"
-                    
+                               
                     if stats.get('deg_top') is not None:
                         section_data["Degrees Top"] = f"{stats['deg_top']:.2f}°"
                     
@@ -571,7 +607,6 @@ class MainWindow(QMainWindow):
 
                 # if section_name == "Ends" and :
                     
-
                 passed_list = []
                 failed_list = []
                 for check_key, check_val in check_data.items():
@@ -589,9 +624,7 @@ class MainWindow(QMainWindow):
 
         else:
             # Default is a blank state
-            section_data = {
-                "Track Status": "Not Generated",
-            }
+            section_data = {"Track Status": "Not Generated",}
         
         # Create and display the dialog
         dialog = StatsDialog(section_name, section_data, parent=self)
@@ -950,7 +983,7 @@ class MainWindow(QMainWindow):
                 warning_msg = "The track was built, but failed the following physics checks:\n\n" + "\n".join(warnings)
                 QMessageBox.warning(self, "Physics Warning", warning_msg)
 
-            self.update_recommendations()                       # Update slider recommendation
+            # self.update_recommendations()                       # Update slider recommendation (TODO - implement later)
             self.update_visual(combined_track, xy_composition)  # Update the visualization panel
 
             QMessageBox.information(self, "Success", f"Assembly Complete!\nCSV file generated: {coaster_name}")

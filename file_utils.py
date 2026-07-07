@@ -1,10 +1,37 @@
+import os
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 import csv
 
-# All functions HERE has to do with file manipulation.
+# Folder creation
+def initalize_folders(section_folder):
+    current_dir = os.path.dirname(os.path.abspath(__file__))
 
+    cwd = os.getcwd()
+    if os.path.basename(cwd) == "IMPETUS":
+        base_dir = cwd
+    else:
+        base_dir = current_dir
+        while os.path.basename(base_dir) != "IMPETUS" and os.path.dirname(base_dir) != base_dir:
+            base_dir = os.path.dirname(base_dir)
+
+        if os.path.basename(base_dir) != "IMPETUS":
+            base_dir = cwd
+
+    master_folder = os.path.join(base_dir, section_folder)
+
+    subfolders = {
+        "master": master_folder,
+        "images": os.path.join(master_folder, "Images"),
+        "coaster": os.path.join(master_folder, "Coasters"),
+    }
+
+    for folder in subfolders.values():
+        os.makedirs(folder, exist_ok=True)
+
+
+# All functions HERE has to do with file manipulation.
 # ========================================================================
 #                           Read from .csv files
 # ========================================================================
@@ -71,7 +98,7 @@ def write_csv(data, pts, prop, elementname):
 # ========================================================================
 #                           Generate .svg files
 # ========================================================================
-def export_layouts(track_data, xy_composition, track_plots):
+def export_layouts(section_folder, track_data, xy_composition, track_plots):
     X, Y, Z, *unused_data = track_data
     font_size, cushion = 8, 5
 
@@ -96,15 +123,15 @@ def export_layouts(track_data, xy_composition, track_plots):
     combined_view(axes, combined_configs, xy_composition, segment_boundaries, X, Z)
 
     # 3. Export standalone views with temporary context decorations
-    export_individual_views(track_plots, segment_boundaries, font_size)
+    export_individual_views(section_folder, track_plots, segment_boundaries, font_size)
 
     # 4. Format combined axes, split if necessary, and save print layout components
-    export_printed_pieces(axes, combined_configs, xy_composition, X, Z, cushion, top_view_y_span, x_min_top, x_max_top, z_min_top, z_max_top)
+    export_printed_pieces(section_folder, axes, combined_configs, xy_composition, X, Z, cushion, top_view_y_span, x_min_top, x_max_top, z_min_top, z_max_top)
 
     # Final combined save
     fig.subplots_adjust(left=1.0/24.0, right=1.0-(1.0/24.0), bottom=1.0/12.0, top=1.0-(1.0/12.0))
-    fig.savefig("Images/combined_track_views.svg", dpi=300)
-    # plt.close(fig)
+    fig.savefig(f"{section_folder}/Images/combined_track_views.svg", dpi=300)
+    plt.close(fig)
 
 
 # === Finds the segment boundaries
@@ -168,7 +195,7 @@ def combined_view(axes, combined_configs, xy_composition, segment_boundaries, X,
         current_horizontal_offset = global_2d_horizontal[-1]
 
 
-def export_individual_views(track_plots, segment_boundaries, font_size):
+def export_individual_views(section_folder, track_plots, segment_boundaries, font_size):
     """Decorates, saves, and reverts isolated view plots from track_plots dict."""
     view_configs = [
         ("whole_track_topview",  "Whole Track Topview"),
@@ -217,7 +244,7 @@ def export_individual_views(track_plots, segment_boundaries, font_size):
 
         ax.axis('off')
         ax.set_title(title, fontsize=font_size)
-        ax.figure.savefig(f"Images/{filename}", dpi=300)
+        ax.figure.savefig(f"{section_folder}/Images/{filename}", dpi=300)
         ax.axis('on')
 
         # Clean up temporary layout lines
@@ -230,7 +257,7 @@ def export_individual_views(track_plots, segment_boundaries, font_size):
                 pass
 
 
-def export_printed_pieces(axes, combined_configs, xy_composition, X, Z, cushion, top_view_y_span, x_min_top, x_max_top, z_min_top, z_max_top):
+def export_printed_pieces(section_folder, axes, combined_configs, xy_composition, X, Z, cushion, top_view_y_span, x_min_top, x_max_top, z_min_top, z_max_top):
     """Processes scaling, adds tooth baselines, and cuts ultra-wide plots into printable chunks."""
     for ax_idx, config in enumerate(combined_configs):
         ax = axes[ax_idx]
@@ -343,7 +370,7 @@ def export_printed_pieces(axes, combined_configs, xy_composition, X, Z, cushion,
             
             safe_title = config["title"].lower().replace(' ', '_').replace('-', '_')
             suffix = f"_{pass_type}" if should_split else ""
-            single_fig.savefig(f"Images/to_print_{safe_title}{suffix}.svg", dpi=300, transparent=True, facecolor='none', pad_inches=0)
+            single_fig.savefig(f"{section_folder}/Images/to_print_{safe_title}{suffix}.svg", dpi=300, transparent=True, facecolor='none', pad_inches=0)
             plt.close(single_fig)
 
 # ========================================================================
@@ -379,3 +406,8 @@ def csv_noLimits_format(data, pts, prop, elementname):
 
     print(f"file {file_name} created successfully")
     return None
+
+
+if __name__ == "__main__":
+    # initalize_folders("Test_Section_123")
+    pass

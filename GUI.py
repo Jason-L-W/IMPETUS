@@ -636,7 +636,7 @@ class MainWindow(QMainWindow):
     # ========================================================================
     #                       Visual Helper Functions
     # ========================================================================
-    def update_visual(self, track_data, xy_composition):
+    def update_visual(self, section_name, track_data, xy_composition):
         self.placeholder_label.hide()  # Hide the placeholder label
         self.visual_tab_widget.show()  # Show the visual widget
 
@@ -774,7 +774,7 @@ class MainWindow(QMainWindow):
             canvas.draw()
 
             # Automatically call to export the files
-            file_utils.export_layouts(track_data, xy_composition, self.track_plots)
+            file_utils.export_layouts(section_name, track_data, xy_composition, self.track_plots)
 
 
     # ========================================================================
@@ -951,16 +951,19 @@ class MainWindow(QMainWindow):
         # === Ask the user for their section and coaster name ===
         dialog = DualInputDialog(self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
-            section_name, coaster_name = dialog.get_inputs()
+            section_folder, coaster_name = dialog.get_inputs()
 
-            if not section_name.strip():
-                section_name = "Test"
+            if not section_folder.strip():
+                section_folder = "Test_Section"
             if not coaster_name.strip():
-                coaster_name = "Combined Coaster"
-            print(f"Section: {section_name} | Coaster: {coaster_name}")
-        
+                coaster_name = "Test_Coaster"
+            print(f"Section: {section_folder} | Coaster: {coaster_name}")
         else:
             return
+        
+        # Initalize the folder structure using the section name provided as the base folder name.
+        # Within it, subfolders of 'images' and 'coasters' will be created to store the generated images and CSV files respectively.
+        file_utils.initalize_folders(section_folder)
 
         wait = QMessageBox(self)
         wait.setWindowTitle("Assembling Tracks")
@@ -970,10 +973,9 @@ class MainWindow(QMainWindow):
 
         # Assemble and visualize tracks
         try:
-            combined_track, xy_composition, track_data = tracks.TrackPart.combine_tracks(*data, coaster_name=coaster_name)
+            combined_track, xy_composition, track_data = tracks.TrackPart.combine_tracks(*data, section_folder=section_folder, coaster_name=coaster_name)
             all_track_stats = {name: {"type": data["section_type"], **data["stats"]} for name, data in track_data.items()}
             all_track_checks = {name: data["checks"] for name, data in track_data.items()}
-            
             self.track_stats, self.checks = all_track_stats, all_track_checks
 
             if wait.isVisible():  
@@ -986,7 +988,7 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, "Physics Warning", warning_msg)
 
             # self.update_recommendations()                       # Update slider recommendation (TODO - implement later)
-            self.update_visual(combined_track, xy_composition)  # Update the visualization panel
+            self.update_visual(section_folder, combined_track, xy_composition)  # Update the visualization panel
 
             QMessageBox.information(self, "Success", f"Assembly Complete!\nCSV file generated: {coaster_name}")
 

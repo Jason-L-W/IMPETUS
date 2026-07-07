@@ -92,7 +92,6 @@ class TrackPart:
         file_utils.write_csv(lifthill, pts, h, file_name)
         track_content = (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name)
         max_y = np.max(Y)
-        print(max_y)
         v_exit = np.sqrt(2 * 9.8 * max_y)
         return track_content, v_exit
 
@@ -753,7 +752,7 @@ class TrackPart:
 
     # Combine multiple track parts into one (Done)
     @staticmethod
-    def combine_tracks(*parts, coaster_name):
+    def combine_tracks(*parts, section_folder ,coaster_name):
         # Parts include the following:
         # "section": the section of the track part (Starts, Thrills 1, Turns, Thrills 2, Ends)
         # "type": the type of the track part
@@ -928,7 +927,7 @@ class TrackPart:
         # === Combine all the data into a single array and write to file_utils ===
         pts = len(X)
         data = np.column_stack((np.arange(1, pts+1), X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz))
-        file_utils.csv_noLimits_format(data, pts, 0, f"Complete_Coaster/{coaster_name}")
+        file_utils.csv_noLimits_format(data, pts, 0, f"{section_folder}/Coasters/{coaster_name}")
 
         # === Data for SolidWorks ===
         # Clean up the data so that its viable to be used by SolidWorks for 3D printing

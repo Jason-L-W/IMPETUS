@@ -193,9 +193,9 @@ class TrackPart:
         H = h * 4 # Total height of corkscrew
         r1 = H / 2 # Radius of corkscrew
         B = 1 / (2 * r1)
+        stretch_factor = 3 # Stretch factor for the corkscrew
 
-
-        l2_base = (3 * np.pi * np.sqrt(H - h)) / 2        
+        l2_base = ((3 * np.pi * np.sqrt(H - h)) / 2) * stretch_factor
         l1 = (-3 * h * np.pi / (2*l2_base) + np.sqrt((3 * h *np.pi / (2 * l2_base))**2 + 6 * B * h)) / (2 * B)
         A = h/(2*l1**3)-B/l1
 
@@ -1141,7 +1141,7 @@ class TrackPhysics:
     
 
 if __name__ == "__main__":
-    (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name) = TrackPart.horseshoe_func(11.0)
+    (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name) = TrackPart.corkscrew_func(11.0)
 
     
     # print(f"X: {max(X)}")
@@ -1154,6 +1154,6 @@ if __name__ == "__main__":
 
     
     plt.figure()
-    plt.plot(X, Y, 'b-', label='Track Path')
-    plt.plot(X + Nx, Y + Ny, 'r-', alpha=0.4, label='Normals')
+    plt.plot(X, Z, 'b-', label='Track Path')
+    plt.plot(X + Nx, Z + Nz, 'r-', alpha=0.4, label='Normals')
     plt.show()

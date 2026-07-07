@@ -710,6 +710,7 @@ class TrackPart:
         return track_data
 
     # Calculate XY Composition
+    @staticmethod
     def calculate_xy_composition(parts, X, Y, Z):
         # === Calculates the xy VS z composition of the track ===
         xy_composition = []
@@ -784,13 +785,17 @@ class TrackPart:
             part_velocities = TrackPhysics.calculate_velocity(v_exit, Y2)
             track_data[section_name]["stats"]["velocities"] = part_velocities
 
-            passed, _ = TrackPhysics.velocity_check(part_velocities)
-            if passed:
+            if section_type == "Rollup":
                 track_data[section_name]["checks"]["velocity_check"] = True
-                v_exit = part_velocities[-1]
+                v_exit = part_velocities[-1] if not np.isnan(part_velocities[-1]) else 0.0
             else:
-                track_data[section_name]["checks"]["velocity_check"] = False
-                v_exit = 0.0 # Coaster stopped tracking forward
+                passed, _ = TrackPhysics.velocity_check(part_velocities)
+                if passed:
+                    track_data[section_name]["checks"]["velocity_check"] = True
+                    v_exit = part_velocities[-1]
+                else:
+                    track_data[section_name]["checks"]["velocity_check"] = False
+                    v_exit = 0.0 # Coaster stopped tracking forward
 
             track_data[section_name]["stats"]["velocity_exit"] = v_exit
 
@@ -1119,11 +1124,12 @@ class TrackPhysics:
 
     @staticmethod
     def rollup_check(v_bot, h):
-        # h_min = (v_bot^2 / 2g) implies a stall risk
-        h_min = (v_bot**2) / (2 * TrackPhysics.g)
-        if h < h_min:
-            return False, h_min
-        return True, h_min
+        # h_climb = (v_bot^2 / 2g)
+        h_climb = (v_bot**2) / (2 * TrackPhysics.g)
+        # Need the h_climb to be larger 
+        if h < h_climb:
+            return False, h_climb
+        return True, h_climb
     
     @staticmethod
     def brake_check(v_bot, L):
@@ -1139,8 +1145,8 @@ if __name__ == "__main__":
     (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name) = TrackPart.horseshoe_func(11.0)
 
     
-    print(f"X: {max(X)}")
-    print(f"Y: {max(Y)}")
+    # print(f"X: {max(X)}")
+    # print(f"Y: {max(Y)}")
 
     # X, Y, Z = X[::-1], Y, Z[::-1]
     # Fx, Fy, Fz = -Fx[::-1], -Fy[::-1], -Fz[::-1]

@@ -119,6 +119,7 @@ class DualInputDialog(QDialog):
         layout.addRow("Enter Coaster Name:", self.coaster_input)
 
         self.button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        self.button_box.setStyleSheet("QPushButton { color: black; }")
         self.button_box.accepted.connect(self.accept)
         self.button_box.rejected.connect(self.reject)
         layout.addRow(self.button_box)
@@ -300,7 +301,7 @@ class MainWindow(QMainWindow):
             
             QTabBar::tab {
                 background-color: white;
-                color: #0000cc;        /* Vibrant blue text */
+                color: #0000cc;
                 font-size: 12px;
                 font-weight: bold;
                 padding: 6px 14px;         
@@ -502,8 +503,8 @@ class MainWindow(QMainWindow):
         length_slider.setRange(1, 50)
 
         # ======= Test Value =======
-        length_input.setText("11")
-        length_slider.setValue(11)
+        # length_input.setText("11")
+        # length_slider.setValue(11)
         # ==========================
         
         # Connects Slider to Line Input Field (Moving the slider updates the text)
@@ -542,6 +543,7 @@ class MainWindow(QMainWindow):
                     param_text = key
                     break
             length_input.setPlaceholderText(f"Track {param_text} (Meters)")
+        
         track_dropdown.currentTextChanged.connect(update_length_label)
 
         if track_dropdown.currentText():
@@ -861,7 +863,7 @@ class MainWindow(QMainWindow):
                 section_passed = False
 
             if section_data.get("rollup_check") is False:
-                warnings.append(f"{section_name}: Rollup incline is too tall. Train will stall.")
+                warnings.append(f"{section_name}: Rollup incline is not tall enough. The coaster will fly off the track.")
                 section_passed = False
 
             if section_data.get("brake_check") is False:

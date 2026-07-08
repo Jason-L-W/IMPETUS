@@ -1,4 +1,5 @@
 import os
+import shutil
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
@@ -28,7 +29,18 @@ def initalize_folders(section_folder):
     }
 
     for folder in subfolders.values():
-        os.makedirs(folder, exist_ok=True)
+        if os.path.exists(folder):
+            for filename in os.listdir(folder):
+                file_path = os.path.join(folder, filename)
+                try:
+                    if os.path.isfile(file_path) or os.path.islink(file_path):
+                        os.unlink(file_path)
+                    elif os.path.isdir(file_path):
+                        shutil.rmtree(file_path)
+                except Exception as e:
+                    print(f"Failed to delete {file_path}. Reason: {e}")
+        else:
+            os.makedirs(folder, exist_ok=True)
 
 
 # All functions HERE has to do with file manipulation.

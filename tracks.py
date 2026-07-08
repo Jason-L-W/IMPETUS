@@ -193,7 +193,7 @@ class TrackPart:
         H = h * 4 # Total height of corkscrew
         r1 = H / 2 # Radius of corkscrew
         B = 1 / (2 * r1)
-        stretch_factor = 3 # Stretch factor for the corkscrew
+        stretch_factor = 2 # Stretch factor for the corkscrew
 
         l2_base = ((3 * np.pi * np.sqrt(H - h)) / 2) * stretch_factor
         l1 = (-3 * h * np.pi / (2*l2_base) + np.sqrt((3 * h *np.pi / (2 * l2_base))**2 + 6 * B * h)) / (2 * B)
@@ -1158,7 +1158,7 @@ class TrackPhysics:
     
 
 if __name__ == "__main__":
-    (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name) = TrackPart.helix_func(20.0)
+    (X, Y, Z, Fx, Fy, Fz, Lx, Ly, Lz, Nx, Ny, Nz, file_name) = TrackPart.corkscrew_func(20.0)
 
     
     # print(f"X: {max(X)}")

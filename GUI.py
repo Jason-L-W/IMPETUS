@@ -30,7 +30,7 @@ ALL_TRACKS = STARTS + THRILLS + TURNS + ENDS                        # Defines al
 CONTROL = {
     "Height": {
         "Lift Hill", "Rollback",
-        "Camelback", "Corkscrew",
+        "Camelback", "Corkscrew", "Loop",
         "Horseshoe", "Cobra Roll", "Helix",
         "Rollup"
     },
@@ -39,10 +39,6 @@ CONTROL = {
         "Launcher",
         "Brake"
     },
-
-    "Radius": {
-        "Loop"
-    }
 }
 # ========================================================================
 
@@ -576,14 +572,20 @@ class MainWindow(QMainWindow):
 
             # Checks the rest of the sections
             if velocity_status != "FAILED/STALL":
-                if stats.get('velocity_exit') is not None:
+                # Display acceleration (Launcher and Brake sections will have acceleration, but the rest of the sections will not)
+                if stats.get('acceleration') is not None:
+                    section_data["Acceleration"] = f"{stats['acceleration']:.2f}g m/s²"
+
+                # Display velocity exiting the section (Not applicable for the Ends section)
+                if stats.get('velocity_exit') is not None and section_name != "Ends":
                     section_data["Exit Velocity"] = f"{stats['velocity_exit']:.2f} m/s"
+
 
                 if section_name.startswith("Thrills") or section_name == "Turns":
                     track_type = str(stats.get('type', ''))
 
                     if stats.get('v_top') is not None:
-                            section_data["Apex (Top) Velocity"] = f"{stats['v_top']:.2f} m/s"
+                        section_data["Apex (Top) Velocity"] = f"{stats['v_top']:.2f} m/s"
                     if stats.get('v_bottom') is not None:
                         section_data["Valley (Bottom) Velocity"] = f"{stats['v_bottom']:.2f} m/s"
 
@@ -607,7 +609,6 @@ class MainWindow(QMainWindow):
                     if stats.get('deg_bottom') is not None:
                         section_data["Degrees Bottom"] = f"{stats['deg_bottom']:.2f}°"
 
-                # if section_name == "Ends" and :
                     
                 passed_list = []
                 failed_list = []

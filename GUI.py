@@ -852,7 +852,7 @@ class MainWindow(QMainWindow):
                 section_passed = False
 
             if section_data.get("inversion_check") is False:
-                warnings.append(f"{section_name}: Not enough speed to clear inversion peak.")
+                warnings.append(f"{section_name}: Too slow or too fast to clear the inversion peak.")
                 section_passed = False
 
             if section_data.get("peak_check") is False:

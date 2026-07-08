@@ -1100,6 +1100,9 @@ class TrackPhysics:
     def valley_check(v_bot, r_1):
         # Check if the valley between two track parts is too deep for the given exit velocity
         # This can be done by calculating the potential energy at the lowest point of the valley and comparing it to the kinetic energy of the coaster at that point
+        if np.isnan(v_bot) or np.isnan(r_1):
+            return False, 0.0
+
         g_valley = TrackPhysics.g + (v_bot**2 / r_1)
         if g_valley >= (5 * TrackPhysics.g):
             return False, g_valley
@@ -1107,13 +1110,24 @@ class TrackPhysics:
 
     @staticmethod
     def inversion_check(v_at_ymax, r_at_ymax):
-        if r_at_ymax <= 1e-3:
+        if np.isnan(v_at_ymax) or np.isnan(r_at_ymax):
             return False, 0.0
 
+        if r_at_ymax <= 1e-3:
+            return False, 0.0
+        
+        # This ensures that they aren't going too fast at the top of the inversion
+        g_top = (v_at_ymax**2 / (r_at_ymax * TrackPhysics.g)) - 1.0
+        max_allowed_g = 3.0  # Limit for comfortable inverted peaks
+        if g_top > max_allowed_g:
+            return False, g_top
+        
+        # This ensures that they aren't going too slow at the top of the inversion
         v_min = np.sqrt(r_at_ymax * TrackPhysics.g)
         if v_at_ymax < v_min:
             return False, v_min
         return True, v_min
+
 
     @staticmethod
     def peak_check(v_at_max, r_at_ymax):

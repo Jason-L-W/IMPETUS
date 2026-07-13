@@ -390,7 +390,7 @@ class TrackPart:
     @staticmethod
     def cobrarollCG_func(h):
         # data = file_utils.read_csv("flashbackcobraroll.csv")
-        data = file_utils.read_csv("New_C.csv")
+        data = file_utils.read_csv("flashbackcobraroll.csv")
         cobraroll = data.copy()
         # Scales the track based on your input height
         cobraroll[:, 1:4] = cobraroll[:, 1:4] * h / np.max(data[:, 2])
